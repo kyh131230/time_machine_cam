@@ -2,8 +2,8 @@ import sys, os, glob, cv2
 from PyQt5 import uic, QtWidgets
 from PyQt5.QtWidgets import QApplication, QMainWindow
 from PyQt5.QtWidgets import QButtonGroup
-from PyQt5.QtCore import Qt, QTimer, QObject, pyqtSignal, QRunnable, QThreadPool
-from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtCore import Qt, QTimer, QObject, pyqtSignal, QRunnable, QThreadPool, QRect
+from PyQt5.QtGui import QImage, QPixmap, QPainter
 from setting import FileController
 from replicate_tasks import AgeJob, PoseJob
 import numpy as np
@@ -41,6 +41,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.pages = []
         self.captured_png_bytes = None
 
+        self.frame_template_paths = [
+            resource_path("frame_1.png"),
+            resource_path("frame_1.png"),
+        ]
+        self.frame_templates = [QPixmap(p) for p in self.frame_template_paths]
+
         for ui_path in sorted(glob.glob(resource_path("ui/*.ui"))):
             w = uic.loadUi(ui_path)
             self.stacked.addWidget(w)
@@ -62,14 +68,32 @@ class MainWindow(QtWidgets.QMainWindow):
             if btn_back:
                 btn_back.clicked.connect(lambda _, i=idx: self.goto_page(i - 1))
 
+        self.frame_boxes_norm = [
+            # frame_1: 위/아래
+            [(0.10, 0.07, 0.80, 0.40), (0.10, 0.53, 0.80, 0.40)],
+            # frame_2
+            [(0.08, 0.05, 0.84, 0.42), (0.08, 0.53, 0.84, 0.42)],
+        ]
+
         self.goto_page(0)  # 첫 화면
         self._write_mode_buttons()
 
         self._setup_capture_page()
         self._setup_pick2_page()
+        self._setup_frame_page()
 
         if self.btn_next_on_capture:
             self.btn_next_on_capture.clicked.connect(self._start_ai_pipeline)
+
+        if self.pick2_next_btn:
+            self.pick2_next_btn.clicked.connect(
+                lambda: (
+                    self.goto_page(self.frame_page_index),
+                    QTimer.singleShot(
+                        0, lambda: self._choose_frame(self.selected_frame_index)
+                    ),
+                )
+            )
 
         self.pool = QThreadPool().globalInstance()
 
@@ -90,6 +114,62 @@ class MainWindow(QtWidgets.QMainWindow):
             " Both people smile and make a heart shape with their hands.",
         ]
         self.pose_prompts = POSE_PROMPTS
+
+    def _compose_frame(self, idx: int) -> QPixmap:
+        if not (0 <= idx < len(self.frame_templates)):
+            return QPixmap()
+
+        base = self.frame_templates[idx]
+        if base.isNull() or not all(self.final_slots):
+            return QPixmap()
+
+        # 정규화 박스를 실제 QRect로 변환
+        boxes = self._boxes_from_norm(idx, base)
+
+        canvas = QPixmap(base.size())
+        canvas.fill(Qt.transparent)
+
+        painter = QPainter(canvas)
+        painter.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+
+        # 프레임 그리기
+        painter.drawPixmap(0, 0, base)
+
+        # 두 장을 각 박스에 채워 넣기 (비율 유지, 박스 꽉 채우기)
+        slots = [self.final_slots[0], self.final_slots[1]]
+
+        for slot_pix, rect in zip(slots, boxes):
+            if isinstance(slot_pix, QPixmap) and not slot_pix.isNull():
+                scaled = slot_pix.scaled(
+                    rect.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation
+                )
+                x_off = max(0, (scaled.width() - rect.width()) // 2)
+                y_off = max(0, (scaled.height() - rect.height()) // 2)
+                cropped = scaled.copy(x_off, y_off, rect.width(), rect.height())
+                painter.drawPixmap(rect.topLeft(), cropped)
+
+        painter.end()
+        return canvas
+
+    def _boxes_from_norm(self, idx: int, base_pix: QPixmap):
+        """정규화(0~1) 박스 → 템플릿 실제 픽셀 좌표 QRect 리스트로 변환"""
+        if not (0 <= idx < len(self.frame_boxes_norm)):
+            return []
+        W, H = base_pix.width(), base_pix.height()
+        rects = []
+        for nx, ny, nw, nh in self.frame_boxes_norm[idx]:
+            x = int(nx * W)
+            y = int(ny * H)
+            w = int(nw * W)
+            h = int(nh * H)
+            # 테두리 침범 방지 살짝 안쪽으로(선택): 2px 인셋
+            inset = 2
+            rects.append(
+                QRect(
+                    x + inset, y + inset, max(1, w - 2 * inset), max(1, h - 2 * inset)
+                )
+            )
+        return rects
 
     def _init_progress_ui(self):
         if hasattr(self, "progress_dlg") and self.progress_dlg is not None:
@@ -360,8 +440,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.pick2_next_btn = getattr(page, "btn_next", None)
 
-        self.final_slots = [None, None]
-        self.slot_source = [None, None]
+        self.final_slots = [None, None]  # 다시 살리기
+        self.slot_source = [None, None]  # 다시 살리기
         self.candidates = []
 
         self._empty_style = (
@@ -570,6 +650,54 @@ class MainWindow(QtWidgets.QMainWindow):
             self._hide_progress()
             if self.pick2_page_index is not None:
                 self.goto_page(self.pick2_page_index)
+
+    def _setup_frame_page(self):
+        self.frame_page_index = None
+        if self.stacked.count() >= 5:
+            self.frame_page_index = 4
+            page = self.stacked.widget(self.frame_page_index)
+        else:
+            return
+
+        self.frame_preview = getattr(page, "frame_preview", None)
+        self.frame_opt_labels = [
+            getattr(page, "frame_opt_1", None),
+            getattr(page, "frame_opt_2", None),
+        ]
+
+        self._frame_thumb_style = "border: 2px solid transparent; background:#000;"
+        self._frame_thumb_selected = "border: 2px solid #4CAF50; background:#000;"
+
+        for frame in self.frame_opt_labels:
+            if frame:
+                frame.setStyleSheet(self._frame_thumb_style)
+
+        for i, frame in enumerate(self.frame_opt_labels):
+            if not frame:
+                continue
+            frame.setStyleSheet(self._frame_thumb_style)
+            if i < len(self.frame_templates) and not self.frame_templates[i].isNull():
+                self._set_pix_to_label(frame, self.frame_templates[i])  # ★ 썸네일 표시
+            # 클릭 연결 (QLabel이면 mousePressEvent로 대체)
+            try:
+                frame.clicked.connect(lambda idx=i: self._choose_frame(idx))
+            except Exception:
+                frame.mousePressEvent = lambda ev, idx=i: self._choose_frame(idx)
+
+        self.selected_frame_index = 0
+
+    def _choose_frame(self, idx: int):
+        self.selected_frame_index = idx
+        for i, frame in enumerate(self.frame_opt_labels):
+            if not frame:
+                continue
+            frame.setStyleSheet(
+                self._frame_thumb_selected if i == idx else self._frame_thumb_style
+            )
+
+        composed = self._compose_frame(idx)  # ← 합성 결과
+        if self.frame_preview and not composed.isNull():
+            self._set_pix_to_label(self.frame_preview, composed)
 
     def goto_page(self, index: int):
         if 0 <= index < self.stacked.count():

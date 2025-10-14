@@ -19,14 +19,22 @@ class AgeJob(QRunnable):
         self.signals = WorkerSignals()
 
         self.prompt_old = (
-            "Transform the person in the uploaded photo into their elderly version, "
-            "approximately 70 years old, with realistic wrinkles, gray hair, and natural skin texture. "
-            "Preserve facial identity and make it a natural portrait photo."
+            "Transform the person in the uploaded photo into an elderly woman, around 80 years old. "
+            "Add deep and defined facial wrinkles, pronounced crow’s feet near the eyes, sagging skin around the neck and cheeks, "
+            "and visible fine lines across the forehead and mouth area. "
+            "Include silver-white hair with a soft, natural texture, slightly thinner and less voluminous. "
+            "Add subtle age spots and slightly duller skin tone, keeping realism. "
+            "Maintain the same face identity, facial structure, and expression, but clearly show the effects of aging. "
+            "Render as a realistic, high-resolution portrait with soft, natural lighting and neutral background."
+            "The transformation should be visibly aged and realistic, not subtle."
         )
+
         self.prompt_young = (
-            "Transform the person in the uploaded photo into their younger version, around 20~30 years old, "
-            "with smooth skin, youthful facial features, and natural hair. Keep the face identity the same and "
-            "make it look like a realistic portrait photo."
+            "Transform the person in the uploaded photo into a youthful version, around 20 to 25 years old. "
+            "Make the skin smooth and radiant, remove wrinkles, and slightly enhance facial symmetry and jawline firmness. "
+            "Keep the same hairstyle, pose, lighting, and composition. "
+            "Maintain facial identity and expression. "
+            "Render as a high-quality, photorealistic studio portrait with soft natural light and clean background."
         )
 
     def _to_data_uri_from_bytes(self, png_bytes: bytes) -> str:
