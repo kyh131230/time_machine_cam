@@ -19,7 +19,7 @@ class AgeJob(QRunnable):
         self.signals = WorkerSignals()
 
         self.prompt_old = (
-            "Transform the person in the uploaded photo into an elderly woman, around 80 years old. "
+            "Transform the person in the uploaded photo into an elderly woman, around 70 years old. "
             "Add deep and defined facial wrinkles, pronounced crow’s feet near the eyes, sagging skin around the neck and cheeks, "
             "and visible fine lines across the forehead and mouth area. "
             "Include silver-white hair with a soft, natural texture, slightly thinner and less voluminous. "

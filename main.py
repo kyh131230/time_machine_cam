@@ -3,6 +3,7 @@ from PyQt5 import uic, QtWidgets
 from PyQt5.QtWidgets import QApplication, QMainWindow
 from PyQt5.QtWidgets import QButtonGroup
 from PyQt5.QtCore import Qt, QTimer, QObject, pyqtSignal, QRunnable, QThreadPool, QRect
+from PyQt5 import QtCore
 from PyQt5.QtGui import QImage, QPixmap, QPainter
 from setting import FileController
 from replicate_tasks import AgeJob, PoseJob
@@ -27,6 +28,63 @@ def cv2_to_qpixmap(bgr):
     return QPixmap.fromImage(qimg)
 
 
+class FrameEditorDialog(QtWidgets.QDialog):
+    def __init__(self, base_pixmap: QPixmap, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Frame 영역 조정기")
+        self.resize(base_pixmap.width(), base_pixmap.height())
+        self.setModal(True)
+
+        self.base_pixmap = base_pixmap
+        self.start_pos = None
+        self.end_pos = None
+        self.rects = []  # 여러 개 가능
+
+        self.label = QtWidgets.QLabel()
+        self.label.setPixmap(base_pixmap)
+        self.label.setAlignment(Qt.AlignCenter)
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(self.label)
+
+        self.label.mousePressEvent = self._on_mouse_press
+        self.label.mouseMoveEvent = self._on_mouse_move
+        self.label.mouseReleaseEvent = self._on_mouse_release
+
+        self.temp_pixmap = base_pixmap.copy()
+
+    def _on_mouse_press(self, e):
+        self.start_pos = e.pos()
+        self.end_pos = None
+        self.temp_pixmap = self.base_pixmap.copy()
+
+    def _on_mouse_move(self, e):
+        if self.start_pos is None:
+            return
+        self.end_pos = e.pos()
+        preview = self.base_pixmap.copy()
+        painter = QPainter(preview)
+        painter.setPen(Qt.red)
+        painter.drawRect(QtCore.QRect(self.start_pos, self.end_pos))
+        painter.end()
+        self.label.setPixmap(preview)
+
+    def _on_mouse_release(self, e):
+        if self.start_pos and self.end_pos:
+            rect = QtCore.QRect(self.start_pos, e.pos()).normalized()
+            self.rects.append(rect)
+            self._print_norm(rect)
+        self.start_pos = None
+        self.label.setPixmap(self.base_pixmap)
+
+    def _print_norm(self, rect: QtCore.QRect):
+        W, H = self.base_pixmap.width(), self.base_pixmap.height()
+        x, y, w, h = rect.x(), rect.y(), rect.width(), rect.height()
+        norm = (round(x / W, 3), round(y / H, 3), round(w / W, 3), round(h / H, 3))
+        print(f"📐 Normalized: {norm}")
+        QtWidgets.QMessageBox.information(self, "좌표 계산 완료", f"{norm} 복사됨")
+        QtWidgets.QApplication.clipboard().setText(str(norm))
+
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
@@ -43,7 +101,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.frame_template_paths = [
             resource_path("frame_1.png"),
-            resource_path("frame_1.png"),
+            resource_path("frame_2.png"),
         ]
         self.frame_templates = [QPixmap(p) for p in self.frame_template_paths]
 
@@ -70,9 +128,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.frame_boxes_norm = [
             # frame_1: 위/아래
-            [(0.10, 0.07, 0.80, 0.40), (0.10, 0.53, 0.80, 0.40)],
+            [(0.077, 0.113, 0.85, 0.425), (0.07, 0.548, 0.86, 0.428)],
             # frame_2
-            [(0.08, 0.05, 0.84, 0.42), (0.08, 0.53, 0.84, 0.42)],
+            [(0.077, 0.113, 0.85, 0.425), (0.07, 0.548, 0.86, 0.428)],
         ]
 
         self.goto_page(0)  # 첫 화면
@@ -109,9 +167,9 @@ class MainWindow(QtWidgets.QMainWindow):
         )
 
         POSE_PROMPTS = [
-            " Both people stand side by side, smile, and give a thumbs-up.",
-            " Both people smile and take a selfie with a phone.",
-            " Both people smile and make a heart shape with their hands.",
+            " each two people stand side by side, smile, and give a thumbs-up.",
+            " each two people hold a smartphone slightly in front of them, smile naturally, and look at the phone screen as if taking a selfie together.",
+            " each two people smile and make a heart shape with their hands.",
         ]
         self.pose_prompts = POSE_PROMPTS
 
@@ -619,7 +677,7 @@ class MainWindow(QtWidgets.QMainWindow):
             job = PoseJob(inputs, p, index=i, token=self.replicate_token, seed=42)
             job.signals.pose_done.connect(self._on_pose_done_bytes)
             job.signals.error.connect(self._on_ai_error)
-            self.pool.start(job)
+            QTimer.singleShot(i * 500, lambda j=job: self.pool.start(j))
 
     def _on_pose_done_bytes(self, index, data: bytes):
         # 모델 출력(한 장) 그대로 썸네일에 표시
@@ -685,6 +743,16 @@ class MainWindow(QtWidgets.QMainWindow):
                 frame.mousePressEvent = lambda ev, idx=i: self._choose_frame(idx)
 
         self.selected_frame_index = 0
+
+        self.title_label = getattr(page, "title_label", None)
+        if self.title_label:
+            self.title_label.clicked.connect(self._open_frame_editor)
+
+    def _open_frame_editor(self):
+        idx = self.selected_frame_index
+        base = self.frame_templates[idx]
+        dlg = FrameEditorDialog(base, self)
+        dlg.exec_()
 
     def _choose_frame(self, idx: int):
         self.selected_frame_index = idx
