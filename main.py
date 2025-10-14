@@ -8,6 +8,7 @@ from PyQt5.QtGui import QImage, QPixmap, QPainter
 from setting import FileController
 from replicate_tasks import AgeJob, PoseJob
 import numpy as np
+import json
 
 
 def resource_path(rel_path: str) -> str:
@@ -32,62 +33,181 @@ class FrameEditorDialog(QtWidgets.QDialog):
     def __init__(self, base_pixmap: QPixmap, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Frame 영역 조정기")
-        self.resize(base_pixmap.width(), base_pixmap.height())
         self.setModal(True)
-
         self.base_pixmap = base_pixmap
-        self.start_pos = None
-        self.end_pos = None
-        self.rects = []  # 여러 개 가능
 
         self.label = QtWidgets.QLabel()
         self.label.setPixmap(base_pixmap)
         self.label.setAlignment(Qt.AlignCenter)
+
         layout = QtWidgets.QVBoxLayout(self)
         layout.addWidget(self.label)
 
+        # 상태
+        self.rects = []  # 완료된 사각형들(최대 2개)
+        self.master_rect = None  # 첫 박스
+        self.start_pos = None
+        self.drag_pos = None
+        self.lock_xw = True  # ✅ 두 번째 박스의 x/width 고정
+        self.equal_height = False  # ⏲️ 필요 시 높이까지 동일화
+
+        self.norms = None
+
+        # 이벤트 바인딩
         self.label.mousePressEvent = self._on_mouse_press
         self.label.mouseMoveEvent = self._on_mouse_move
         self.label.mouseReleaseEvent = self._on_mouse_release
 
-        self.temp_pixmap = base_pixmap.copy()
+        # 도움말
+        QtWidgets.QToolTip.showText(
+            self.mapToGlobal(self.rect().center()),
+            "드래그해서 위/아래 박스 2개를 그리세요.\n"
+            "L: 좌우 고정 토글  |  H: 높이 동일 토글",
+            self,
+        )
 
-    def _on_mouse_press(self, e):
-        self.start_pos = e.pos()
-        self.end_pos = None
-        self.temp_pixmap = self.base_pixmap.copy()
-
-    def _on_mouse_move(self, e):
+    def _on_mouse_move(self, ev):
         if self.start_pos is None:
             return
-        self.end_pos = e.pos()
+        self.drag_pos = ev.pos()
+
         preview = self.base_pixmap.copy()
-        painter = QPainter(preview)
-        painter.setPen(Qt.red)
-        painter.drawRect(QtCore.QRect(self.start_pos, self.end_pos))
-        painter.end()
+        p = QPainter(preview)
+        p.setPen(Qt.red)
+
+        r = self._current_preview_rect()
+        if r:
+            p.drawRect(r)
+
+        for rr in self.rects:
+            p.drawRect(rr)
+        p.end()
         self.label.setPixmap(preview)
 
-    def _on_mouse_release(self, e):
-        if self.start_pos and self.end_pos:
-            rect = QtCore.QRect(self.start_pos, e.pos()).normalized()
-            self.rects.append(rect)
-            self._print_norm(rect)
-        self.start_pos = None
-        self.label.setPixmap(self.base_pixmap)
+    def keyPressEvent(self, e):
+        if e.key() == Qt.Key_L:
+            self.lock_xw = not self.lock_xw
+            QtWidgets.QToolTip.showText(
+                self.mapToGlobal(self.rect().center()),
+                f"좌우 고정: {'ON' if self.lock_xw else 'OFF'}",
+                self,
+            )
+        elif e.key() == Qt.Key_H:
+            self.equal_height = not self.equal_height
+            QtWidgets.QToolTip.showText(
+                self.mapToGlobal(self.rect().center()),
+                f"높이 동일: {'ON' if self.equal_height else 'OFF'}",
+                self,
+            )
+        else:
+            super().keyPressEvent(e)
 
-    def _print_norm(self, rect: QtCore.QRect):
+    def _on_mouse_press(self, ev):
+        if ev.button() != Qt.LeftButton:
+            return
+        if len(self.rects) >= 2:
+            # 두 개 완료되면 바로 정규화 출력
+            self._emit_norm_and_close()
+            return
+        self.start_pos = ev.pos()
+        self.drag_pos = ev.pos()
+
+    def _current_preview_rect(self):
+        if self.start_pos is None or self.drag_pos is None:
+            return None
+        r = QtCore.QRect(self.start_pos, self.drag_pos).normalized()
+
+        # 두 번째 박스부터는 x, width, height 전부 고정
+        if self.master_rect:
+            r.setX(self.master_rect.x())
+            r.setWidth(self.master_rect.width())
+            r.setHeight(self.master_rect.height())
+        return r
+
+    def _on_mouse_release(self, ev):
+        if self.start_pos is None:
+            return
+        self.drag_pos = ev.pos()
+        r = self._current_preview_rect()
+        self.start_pos = None
+        self.drag_pos = None
+        if not r or r.width() <= 0 or r.height() <= 0:
+            self.label.setPixmap(self.base_pixmap)
+            return
+
+        self.rects.append(r)
+        if len(self.rects) == 1:
+            self.master_rect = r  # ✅ 첫 박스 기준
+        elif len(self.rects) >= 2:
+            # 두 번째 박스 높이 동일 강제
+            r.setHeight(self.master_rect.height())
+            # 두 개 모두 정렬 후 정규화 출력
+            self.rects.sort(key=lambda rr: rr.y())
+            self._emit_norm_and_close()
+            return
+
+        # 갱신
+        preview = self.base_pixmap.copy()
+        p = QPainter(preview)
+        p.setPen(Qt.red)
+        for rr in self.rects:
+            p.drawRect(rr)
+        p.end()
+        self.label.setPixmap(preview)
+
+    def _on_mouse_release(self, ev):
+        if self.start_pos is None:
+            return
+        self.drag_pos = ev.pos()
+        r = self._current_preview_rect()
+        self.start_pos = None
+        self.drag_pos = None
+        if not r or r.width() <= 0 or r.height() <= 0:
+            # 무효 드래그
+            self.label.setPixmap(self.base_pixmap)
+            return
+
+        self.rects.append(r)
+        if len(self.rects) == 1:
+            self.master_rect = r  # ✅ 첫 박스를 마스터로 저장
+        elif len(self.rects) >= 2:
+            # 두 개 모두 그려졌으면 정렬(위→아래) 후 출력
+            self.rects.sort(key=lambda rr: rr.y())
+            self._emit_norm_and_close()
+            return
+
+        # 갱신
+        preview = self.base_pixmap.copy()
+        p = QPainter(preview)
+        p.setPen(Qt.red)
+        for rr in self.rects:
+            p.drawRect(rr)
+        p.end()
+        self.label.setPixmap(preview)
+
+    def _emit_norm_and_close(self):
         W, H = self.base_pixmap.width(), self.base_pixmap.height()
-        x, y, w, h = rect.x(), rect.y(), rect.width(), rect.height()
-        norm = (round(x / W, 3), round(y / H, 3), round(w / W, 3), round(h / H, 3))
-        print(f"📐 Normalized: {norm}")
-        QtWidgets.QMessageBox.information(self, "좌표 계산 완료", f"{norm} 복사됨")
-        QtWidgets.QApplication.clipboard().setText(str(norm))
+        norms = []
+        for rr in self.rects[:2]:
+            nx = rr.x() / W
+            ny = rr.y() / H
+            nw = rr.width() / W
+            nh = rr.height() / H
+            norms.append((round(nx, 4), round(ny, 4), round(nw, 4), round(nh, 4)))
+
+        self.norms = norms  # ⬅ 결과 보관
+        QtWidgets.QApplication.clipboard().setText(str(norms))
+        print("✅ frame_boxes_norm:", norms)
+        self.accept()
 
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
+
+        self._frame_boxes_path = os.path.join(
+            os.path.dirname(__file__), "frame_boxes.json"
+        )
 
         self.ai_running = False
         self.poses_left = 0
@@ -132,6 +252,7 @@ class MainWindow(QtWidgets.QMainWindow):
             # frame_2
             [(0.077, 0.113, 0.85, 0.425), (0.07, 0.548, 0.86, 0.428)],
         ]
+        self._load_frame_boxes()
 
         self.goto_page(0)  # 첫 화면
         self._write_mode_buttons()
@@ -172,6 +293,26 @@ class MainWindow(QtWidgets.QMainWindow):
             " each two people smile and make a heart shape with their hands.",
         ]
         self.pose_prompts = POSE_PROMPTS
+
+    def _load_frame_boxes(self):
+        try:
+            if os.path.exists(self._frame_boxes_path):
+                with open(self._frame_boxes_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                # 간단 검증 (프레임 수/박스 수 같을 때만 반영)
+                if isinstance(data, list) and all(
+                    isinstance(x, list) and len(x) == 2 for x in data
+                ):
+                    self.frame_boxes_norm = data
+        except Exception as e:
+            print("[frame_boxes] load failed:", e)
+
+    def _save_frame_boxes(self):
+        try:
+            with open(self._frame_boxes_path, "w", encoding="utf-8") as f:
+                json.dump(self.frame_boxes_norm, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print("[frame_boxes] save failed:", e)
 
     def _compose_frame(self, idx: int) -> QPixmap:
         if not (0 <= idx < len(self.frame_templates)):
@@ -750,9 +891,16 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _open_frame_editor(self):
         idx = self.selected_frame_index
+        if idx < 0 or idx >= len(self.frame_templates):
+            return
         base = self.frame_templates[idx]
         dlg = FrameEditorDialog(base, self)
-        dlg.exec_()
+        if dlg.exec_() == QtWidgets.QDialog.Accepted and dlg.norms:
+            # 현재 프레임의 박스 좌표 교체
+            self.frame_boxes_norm[idx] = dlg.norms
+            self._save_frame_boxes()
+            # 미리보기 즉시 갱신
+            self._choose_frame(idx)
 
     def _choose_frame(self, idx: int):
         self.selected_frame_index = idx
@@ -785,6 +933,12 @@ class MainWindow(QtWidgets.QMainWindow):
             ):
                 if index == self.capture_page_index:
                     self._enter_capture_page()
+
+            if hasattr(self, "frame_page_index") and index == self.frame_page_index:
+                # 저장된 좌표로 미리보기 다시 그리기
+                QTimer.singleShot(
+                    0, lambda: self._choose_frame(self.selected_frame_index)
+                )
 
 
 if __name__ == "__main__":
