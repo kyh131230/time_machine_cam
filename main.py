@@ -9,6 +9,8 @@ from setting import FileController
 from replicate_tasks import AgeJob, PoseJob
 import numpy as np
 import json
+from PyQt5.QtPrintSupport import QPrinter
+from PyQt5.QtCore import QSizeF
 
 
 def resource_path(rel_path: str) -> str:
@@ -252,6 +254,9 @@ class MainWindow(QtWidgets.QMainWindow):
             # frame_2
             [(0.077, 0.113, 0.85, 0.425), (0.07, 0.548, 0.86, 0.428)],
         ]
+
+        self.final_composed_pixmap = QPixmap()
+
         self._load_frame_boxes()
 
         self.goto_page(0)  # 첫 화면
@@ -260,6 +265,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._setup_capture_page()
         self._setup_pick2_page()
         self._setup_frame_page()
+        self._setup_print_page()
 
         if self.btn_next_on_capture:
             self.btn_next_on_capture.clicked.connect(self._start_ai_pipeline)
@@ -288,11 +294,67 @@ class MainWindow(QtWidgets.QMainWindow):
         )
 
         POSE_PROMPTS = [
-            " each two people stand side by side, smile, and give a thumbs-up.",
-            " each two people hold a smartphone slightly in front of them, smile naturally, and look at the phone screen as if taking a selfie together.",
-            " each two people smile and make a heart shape with their hands.",
-        ]
+        "Both people stand side by side and give a thumbs-up. Keep the same identities and ages as in the inputs.",
+        "One person holds a smartphone; both smile and look at the phone screen together, as if taking a selfie. Keep the same identities and ages as in the inputs.",
+        "Both people smile and form a heart shape with their hands. Keep the same identities and ages as in the inputs.",
+    ]
         self.pose_prompts = POSE_PROMPTS
+
+    def _setup_print_page(self):
+        """6번째 인쇄 페이지 초기 설정"""
+        self.print_page_index = None
+        if self.stacked.count() >= 6:
+            self.print_page_index = 5
+            page = self.stacked.widget(self.print_page_index)
+        else:
+            return
+
+        # ui 파일에 아래 두 위젯이 있다고 가정: print_preview(QLabel), btn_print(QPushButton)
+        self.print_preview = getattr(page, "print_preview", None)
+        self.btn_print = getattr(page, "btn_print", None)
+        if self.btn_print:
+            self.btn_print.clicked.connect(self._print_final_frame)
+
+    def _enter_print_page(self):
+        """6페이지 들어올 때 미리보기 갱신"""
+        if self.print_preview and not self.final_composed_pixmap.isNull():
+            self._set_pix_to_label(self.print_preview, self.final_composed_pixmap)
+
+    def _print_final_frame(self):
+        """버튼 클릭 시 바로 포토프린터로 여백 없이 인쇄"""
+        if (
+            not hasattr(self, "final_composed_pixmap")
+            or self.final_composed_pixmap.isNull()
+        ):
+            QtWidgets.QMessageBox.warning(self, "오류", "출력할 이미지가 없습니다.")
+            return
+
+        printer = QPrinter(QPrinter.HighResolution)
+        printer.setOutputFormat(
+            QPrinter.NativeFormat
+        )  # 실제 프린터 출력 => NativeFormat
+        printer.setPrinterName("ALPDF")  # (선택) 특정 프린터 지정
+
+        # 10x15cm 용지 + 여백 0(borderless)
+        printer.setPaperSize(QSizeF(100, 150), QPrinter.Millimeter)
+        printer.setFullPage(True)
+        printer.setPageMargins(0, 0, 0, 0, QPrinter.Millimeter)
+        printer.setOrientation(QPrinter.Portrait)
+        printer.setResolution(300)
+
+        painter = QPainter(printer)
+        page = painter.viewport()
+        pm = self.final_composed_pixmap
+        scaled = pm.scaled(page.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        x = (page.width() - scaled.width()) // 2
+        y = (page.height() - scaled.height()) // 2
+
+        painter.drawPixmap(x, y, scaled)
+        painter.end()
+
+        QtWidgets.QMessageBox.information(
+            self, "인쇄 완료", "✅ 인생네컷 사진이 바로 출력되었습니다!"
+        )
 
     def _load_frame_boxes(self):
         try:
@@ -552,7 +614,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             if hasattr(self, "_last_frame_bgr") and self._last_frame_bgr is not None:
                 success, buf = cv2.imencode(
-                    ".png", cv2.imread("qwer_2.jpg")
+                    ".png", cv2.imread("cew.jpg")
                 )  # self._last_frame_bgr로 교체
                 if success:
                     self.captured_png_bytes = bytes(buf)
@@ -818,7 +880,7 @@ class MainWindow(QtWidgets.QMainWindow):
             job = PoseJob(inputs, p, index=i, token=self.replicate_token, seed=42)
             job.signals.pose_done.connect(self._on_pose_done_bytes)
             job.signals.error.connect(self._on_ai_error)
-            QTimer.singleShot(i * 500, lambda j=job: self.pool.start(j))
+            QTimer.singleShot(i * 2000, lambda j=job: self.pool.start(j))
 
     def _on_pose_done_bytes(self, index, data: bytes):
         # 모델 출력(한 장) 그대로 썸네일에 표시
@@ -889,6 +951,16 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.title_label:
             self.title_label.clicked.connect(self._open_frame_editor)
 
+        # 5페이지의 next 버튼이 btn_next 라고 가정
+        self.frame_next_btn = getattr(page, "btn_next", None)
+        if self.frame_next_btn:
+            self.frame_next_btn.clicked.connect(
+                lambda: (
+                    self.goto_page(self.print_page_index),
+                    self._enter_print_page(),
+                )
+            )
+
     def _open_frame_editor(self):
         idx = self.selected_frame_index
         if idx < 0 or idx >= len(self.frame_templates):
@@ -912,8 +984,10 @@ class MainWindow(QtWidgets.QMainWindow):
             )
 
         composed = self._compose_frame(idx)  # ← 합성 결과
-        if self.frame_preview and not composed.isNull():
-            self._set_pix_to_label(self.frame_preview, composed)
+        if not composed.isNull():
+            self.final_composed_pixmap = composed
+            if self.frame_preview:
+                self._set_pix_to_label(self.frame_preview, composed)
 
     def goto_page(self, index: int):
         if 0 <= index < self.stacked.count():
@@ -939,6 +1013,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 QTimer.singleShot(
                     0, lambda: self._choose_frame(self.selected_frame_index)
                 )
+
+            if hasattr(self, "print_page_index") and index == self.print_page_index:
+                self._enter_print_page()
 
 
 if __name__ == "__main__":
