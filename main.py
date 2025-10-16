@@ -288,16 +288,12 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.replicate_token:
             os.environ["REPLICATE_API_TOKEN"] = self.replicate_token
 
-        TWO_PERSON_LOCK = (
-            "Use both people from the input photo together in one frame. "
-            "Show exactly two people. No single-person composition."
-        )
-
         POSE_PROMPTS = [
-        "Both people stand side by side and give a thumbs-up. Keep the same identities and ages as in the inputs.",
-        "One person holds a smartphone; both smile and look at the phone screen together, as if taking a selfie. Keep the same identities and ages as in the inputs.",
-        "Both people smile and form a heart shape with their hands. Keep the same identities and ages as in the inputs.",
-    ]
+            "Use @orig and @aged as two distinct people standing side by side. Both give a thumbs-up with their right hands. Keep each person’s facial identity, hairstyle, clothing vibe, and age consistent with their own reference. Medium shot, straight-on, 1:1 framing, natural indoor lighting. Do not merge faces; keep @orig and @aged clearly separate.",
+            "A realistic selfie composition: @orig holds a smartphone naturally in her right hand and slightly raises it at an upward angle. @aged sits or stands close on the left side, gently leaning toward @orig while both smile and look at the phone screen together. Keep their facial identities, hairstyles, and ages exactly as in the references. Show natural wrist angle and correct phone orientation (no twisted hand). Medium-close shot, 1:1 framing, soft pink background lighting similar to a beauty studio, realistic phone reflection and glow.",
+            "Both @orig and @aged face the camera and form a heart shape together with their hands at chest height. Warm, soft light; medium shot, 1:1 composition. Preserve each identity, hairstyle, clothing vibe, and age from references. Keep them as two distinct people—no merging.",
+        ]
+
         self.pose_prompts = POSE_PROMPTS
 
     def _setup_print_page(self):
@@ -614,7 +610,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             if hasattr(self, "_last_frame_bgr") and self._last_frame_bgr is not None:
                 success, buf = cv2.imencode(
-                    ".png", cv2.imread("cew.jpg")
+                    ".png", cv2.imread("senior(male).png")
                 )  # self._last_frame_bgr로 교체
                 if success:
                     self.captured_png_bytes = bytes(buf)
@@ -868,7 +864,24 @@ class MainWindow(QtWidgets.QMainWindow):
         QtWidgets.QMessageBox.warning(self, "AI 생성 오류", msg)
 
     def _on_age_done(self, base_url: str):
-        self._update_progress(self._age_weight)
+        # 🔍 base_url이 URL이면 이미지 저장 (디버그용)
+        import requests
+
+        try:
+            if isinstance(base_url, str) and base_url.startswith("http"):
+                response = requests.get(base_url, timeout=10)
+                if response.status_code == 200:
+                    with open("my-image.png", "wb") as f:
+                        f.write(response.content)
+                    print("[DEBUG] Saved base_url image → my-image.png")
+                else:
+                    print(
+                        f"[DEBUG] Failed to download image, status={response.status_code}"
+                    )
+            else:
+                print(f"[DEBUG] base_url is not a valid URL: {base_url}")
+        except Exception as e:
+            print(f"[DEBUG] Error saving base_url image: {e}")
 
         inputs = [base_url]
         if hasattr(self, "captured_png_bytes") and self.captured_png_bytes:
@@ -877,7 +890,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.poses_left = len(self.pose_prompts)
 
         for i, p in enumerate(self.pose_prompts):
-            job = PoseJob(inputs, p, index=i, token=self.replicate_token, seed=42)
+            job = PoseJob(
+                inputs=inputs,
+                pose_prompt=p,
+                index=i,
+                token=self.replicate_token,
+                seed=42,
+                aspect_ratio="1:1",
+                resolution="720p",
+            )
             job.signals.pose_done.connect(self._on_pose_done_bytes)
             job.signals.error.connect(self._on_ai_error)
             QTimer.singleShot(i * 2000, lambda j=job: self.pool.start(j))

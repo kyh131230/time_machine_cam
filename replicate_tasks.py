@@ -19,25 +19,17 @@ class AgeJob(QRunnable):
         self.signals = WorkerSignals()
 
         self.prompt_old = (
-            "Transform the person in the uploaded photo into an elderly woman, around 70 years old. "
-            "Add deep and defined facial wrinkles, pronounced crow’s feet near the eyes, sagging skin around the neck and cheeks, "
-            "and visible fine lines across the forehead and mouth area. "
-            "Include silver-white hair with a soft, natural texture, slightly thinner and less voluminous. "
-            "Add subtle age spots and slightly duller skin tone, keeping realism. "
-            "Maintain the same face identity, facial structure, and expression, but clearly show the effects of aging. "
-            "Render as a realistic, high-resolution portrait with soft, natural lighting and neutral background."
-            "The transformation should be visibly aged and realistic, not subtle."
+            "Transform the person in the uploaded photo into an adult version, around 30 years old. "
+            "Make the face look slightly more mature while keeping the same identity, gender, and hairstyle. "
+            "Add subtle adult facial proportions and natural skin texture without wrinkles. "
+            "Render as a realistic, high-quality studio portrait with soft lighting and neutral background."
         )
 
         self.prompt_young = (
-            "Create a new photo showing how the person in the uploaded image looked as a young adult, around 20 to 25 years old. "
-            "Do not keep or edit the current aged appearance—do not retain wrinkles, age spots, gray hair, or aged skin texture. "
-            "Preserve the same facial identity and proportions while reimagining their youthful features. "
-            "Show smooth, firm, radiant skin, fuller cheeks, and a natural youthful jawline. "
-            "Hair should appear darker, thicker, and naturally voluminous. "
-            "Keep a similar pose, lighting, and camera composition for continuity. "
-            "Render a photorealistic, high-resolution studio portrait with soft natural light and a clean background. "
-            "The result must look clearly youthful and lifelike, not subtle."
+            "Transform the person in the uploaded photo into a younger version, around 20 years old. "
+            "Keep the same facial identity, gender, and hairstyle as in the original photo. "
+            "Smooth the skin and remove wrinkles naturally while preserving the person’s features. "
+            "Render as a photorealistic high-quality portrait with soft lighting and neutral background."
         )
 
     def _to_data_uri_from_bytes(self, png_bytes: bytes) -> str:
@@ -78,14 +70,23 @@ class PoseJob(QRunnable):
     """
 
     def __init__(
-        self, inputs, pose_prompt: str, index: int, token: str, seed: int = 42
+        self,
+        inputs,  # [aged_bytes_or_url, orig_bytes_or_url]
+        pose_prompt: str,
+        index: int,
+        token: str,
+        seed: int = 42,
+        aspect_ratio: str = "1:1",
+        resolution: str = "720p",
     ):
         super().__init__()
         self.inputs = inputs
         self.pose_prompt = pose_prompt
         self.index = index
-        self.seed = seed  # 포즈별 다른 seed
+        self.seed = seed
         self.token = token
+        self.aspect_ratio = aspect_ratio
+        self.resolution = resolution
         self.signals = WorkerSignals()
 
     def _to_data_uri_from_bytes(self, png_bytes: bytes) -> str:
@@ -110,16 +111,16 @@ class PoseJob(QRunnable):
     def run(self):
         try:
             os.environ["REPLICATE_API_TOKEN"] = self.token
-            image_input = self._normalize_image_inputs(self.inputs)
+            refs = self._normalize_image_inputs(self.inputs)
 
             out = replicate.run(
-                "flux-kontext-apps/multi-image-kontext-max",
+                "runwayml/gen4-image",
                 input={
                     "prompt": self.pose_prompt,
-                    "aspect_ratio": "1:1",
-                    "input_image_1": image_input[0],
-                    "input_image_2": image_input[1],
-                    "output_format": "png",
+                    "reference_images": refs,  # 최대 3장
+                    "reference_tags": ["aged", "orig"],  # refs와 같은 순서
+                    "aspect_ratio": self.aspect_ratio,  # 예: "1:1"
+                    "resolution": self.resolution,  # 예: "1080p"
                     "seed": self.seed,
                 },
             )
