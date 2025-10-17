@@ -218,8 +218,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.CANVAS_H = 1748  # px  (148 mm @ 300 DPI)
 
         self.frame_template_paths = [
-            resource_path("frame_1.png"),
-            resource_path("frame_2.png"),
+            resource_path("img/frame_1.png"),
+            resource_path("img/frame_2.png"),
         ]
         self.frame_templates = []
         for p in self.frame_template_paths:
@@ -641,7 +641,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             if hasattr(self, "_last_frame_bgr") and self._last_frame_bgr is not None:
                 success, buf = cv2.imencode(
-                    ".png", cv2.imread("senior(male).png")
+                    ".png", cv2.imread("img/senior(male).png")
                 )  # self._last_frame_bgr로 교체
                 if success:
                     self.captured_png_bytes = bytes(buf)
