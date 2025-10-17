@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1300</width>
-    <height>954</height>
+    <height>1050</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -133,7 +133,7 @@
         </font>
        </property>
        <property name="text">
-        <string>AI 기반 타임 머신 포토 부스</string>
+        <string>세대 체인지 AI 인생사진관</string>
        </property>
        <property name="alignment">
         <set>Qt::AlignCenter</set>

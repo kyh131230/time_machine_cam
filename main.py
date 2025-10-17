@@ -299,8 +299,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         POSE_PROMPTS = [
             "Use @orig and @aged as two distinct people standing side by side. Both give a thumbs-up with their right hands. Keep each person’s facial identity, hairstyle, clothing vibe, and age consistent with their own reference. Medium shot, straight-on, 1:1 framing, natural indoor lighting. Do not merge faces; keep @orig and @aged clearly separate.",
-            "@aged holds a phone in the right hand, raising it slightly upward for a selfie, and makes a V sign with the left hand. @orig stands close beside, also making a V sign. Both look upward toward the phone camera. Shoulder-to-shoulder composition, natural selfie angle, 1:1 framing.",
-            "Both @orig and @aged face the camera and form a heart shape together with their hands at chest height. Warm, soft light; medium shot, 1:1 composition. Preserve each identity, hairstyle, clothing vibe, and age from references. Keep them as two distinct people—no merging.",
+            "@aged holds a phone above head level with the right hand for a selfie, while @orig stands close beside making a V sign with one hand. Both look toward the phone. Shoulder-to-shoulder, 1:1 framing. not face and hand distortion",
+            "@orig and @aged each use one hand to form a heart shape together. Shoulder-to-shoulder, 1:1 framing.",
         ]
 
         self.pose_prompts = POSE_PROMPTS
