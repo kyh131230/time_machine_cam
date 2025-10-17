@@ -2,15 +2,24 @@ import sys, os, glob, cv2
 from PyQt5 import uic, QtWidgets
 from PyQt5.QtWidgets import QApplication, QMainWindow
 from PyQt5.QtWidgets import QButtonGroup
-from PyQt5.QtCore import Qt, QTimer, QObject, pyqtSignal, QRunnable, QThreadPool, QRect
+from PyQt5.QtCore import (
+    Qt,
+    QTimer,
+    QObject,
+    pyqtSignal,
+    QRunnable,
+    QThreadPool,
+    QRect,
+    QMarginsF,
+)
 from PyQt5 import QtCore
-from PyQt5.QtGui import QImage, QPixmap, QPainter
+from PyQt5.QtGui import QImage, QPixmap, QPainter, QPageSize, QPageLayout
 from setting import FileController
 from replicate_tasks import AgeJob, PoseJob
 import numpy as np
 import json
 from PyQt5.QtPrintSupport import QPrinter
-from PyQt5.QtCore import QSizeF
+from PyQt5.QtCore import QSizeF, QSize
 
 
 def resource_path(rel_path: str) -> str:
@@ -37,158 +46,143 @@ class FrameEditorDialog(QtWidgets.QDialog):
         self.setWindowTitle("Frame 영역 조정기")
         self.setModal(True)
         self.base_pixmap = base_pixmap
+        self.orig_w, self.orig_h = base_pixmap.width(), base_pixmap.height()
 
+        # ---- 미리보기 크기 결정 (화면의 70% 안쪽, 가로 최대 720px 권장) ----
+        scr = QtWidgets.QApplication.primaryScreen().availableGeometry()
+        max_w = min(720, int(scr.width() * 0.7))
+        max_h = int(scr.height() * 0.8)
+        self.scale = min(max_w / self.orig_w, max_h / self.orig_h)
+        if self.scale <= 0:
+            self.scale = 1.0
+
+        self.view_w = int(self.orig_w * self.scale)
+        self.view_h = int(self.orig_h * self.scale)
+
+        # 라벨(미리보기)
         self.label = QtWidgets.QLabel()
-        self.label.setPixmap(base_pixmap)
+        self.label.setFixedSize(self.view_w, self.view_h)
         self.label.setAlignment(Qt.AlignCenter)
+
+        # 최초 미리보기 그림
+        self.view_pixmap = self.base_pixmap.scaled(
+            self.view_w, self.view_h, Qt.KeepAspectRatio, Qt.SmoothTransformation
+        )
+        self.label.setPixmap(self.view_pixmap)
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.addWidget(self.label)
 
         # 상태
-        self.rects = []  # 완료된 사각형들(최대 2개)
-        self.master_rect = None  # 첫 박스
-        self.start_pos = None
-        self.drag_pos = None
-        self.lock_xw = True  # ✅ 두 번째 박스의 x/width 고정
-        self.equal_height = False  # ⏲️ 필요 시 높이까지 동일화
-
-        self.norms = None
+        self.rects = []  # 원본 좌표계(QRect)
+        self.master_rect = None
+        self.start_pos = None  # 원본 좌표계의 시작점(QPoint)
+        self.drag_pos = None  # 원본 좌표계의 현재점(QPoint)
 
         # 이벤트 바인딩
         self.label.mousePressEvent = self._on_mouse_press
         self.label.mouseMoveEvent = self._on_mouse_move
         self.label.mouseReleaseEvent = self._on_mouse_release
 
-        # 도움말
         QtWidgets.QToolTip.showText(
             self.mapToGlobal(self.rect().center()),
-            "드래그해서 위/아래 박스 2개를 그리세요.\n"
-            "L: 좌우 고정 토글  |  H: 높이 동일 토글",
+            "드래그해서 위/아래 박스 2개를 그리세요.",
             self,
         )
 
-    def _on_mouse_move(self, ev):
-        if self.start_pos is None:
-            return
-        self.drag_pos = ev.pos()
+        # 다이얼로그 사이즈
+        self.resize(self.view_w + 24, self.view_h + 24)
 
-        preview = self.base_pixmap.copy()
-        p = QPainter(preview)
-        p.setPen(Qt.red)
+    # ---- 좌표 변환 헬퍼 (뷰 → 원본) ----
+    def _to_orig_pt(self, p: QtCore.QPoint) -> QtCore.QPoint:
+        x = int(round(p.x() / self.scale))
+        y = int(round(p.y() / self.scale))
+        x = max(0, min(self.orig_w - 1, x))
+        y = max(0, min(self.orig_h - 1, y))
+        return QtCore.QPoint(x, y)
 
-        r = self._current_preview_rect()
-        if r:
-            p.drawRect(r)
-
-        for rr in self.rects:
-            p.drawRect(rr)
-        p.end()
-        self.label.setPixmap(preview)
-
-    def keyPressEvent(self, e):
-        if e.key() == Qt.Key_L:
-            self.lock_xw = not self.lock_xw
-            QtWidgets.QToolTip.showText(
-                self.mapToGlobal(self.rect().center()),
-                f"좌우 고정: {'ON' if self.lock_xw else 'OFF'}",
-                self,
-            )
-        elif e.key() == Qt.Key_H:
-            self.equal_height = not self.equal_height
-            QtWidgets.QToolTip.showText(
-                self.mapToGlobal(self.rect().center()),
-                f"높이 동일: {'ON' if self.equal_height else 'OFF'}",
-                self,
-            )
-        else:
-            super().keyPressEvent(e)
+    # ---- 사각형 스케일 (원본 → 뷰) ----
+    def _to_view_rect(self, r: QtCore.QRect) -> QtCore.QRect:
+        return QtCore.QRect(
+            int(round(r.x() * self.scale)),
+            int(round(r.y() * self.scale)),
+            int(round(r.width() * self.scale)),
+            int(round(r.height() * self.scale)),
+        )
 
     def _on_mouse_press(self, ev):
         if ev.button() != Qt.LeftButton:
             return
         if len(self.rects) >= 2:
-            # 두 개 완료되면 바로 정규화 출력
             self._emit_norm_and_close()
             return
-        self.start_pos = ev.pos()
-        self.drag_pos = ev.pos()
+        self.start_pos = self._to_orig_pt(ev.pos())
+        self.drag_pos = self.start_pos
 
-    def _current_preview_rect(self):
+    def _on_mouse_move(self, ev):
+        if self.start_pos is None:
+            return
+        self.drag_pos = self._to_orig_pt(ev.pos())
+        # 미리보기 갱신 (뷰 좌표로 그림)
+        preview = self.view_pixmap.copy()
+        p = QPainter(preview)
+        p.setPen(Qt.red)
+        cur = self._current_rect()
+        if cur:
+            p.drawRect(self._to_view_rect(cur))
+        for rr in self.rects:
+            p.drawRect(self._to_view_rect(rr))
+        p.end()
+        self.label.setPixmap(preview)
+
+    def _on_mouse_release(self, ev):
+        if self.start_pos is None:
+            return
+        self.drag_pos = self._to_orig_pt(ev.pos())
+        r = self._current_rect()
+        self.start_pos = None
+        self.drag_pos = None
+        if not r or r.width() <= 0 or r.height() <= 0:
+            self.label.setPixmap(self.view_pixmap)
+            return
+
+        # 첫 박스 확정
+        if not self.rects:
+            self.master_rect = r
+            self.rects.append(r)
+        else:
+            # 두 번째 박스는 첫 박스의 x/width/height를 강제 고정
+            r.setX(self.master_rect.x())
+            r.setWidth(self.master_rect.width())
+            r.setHeight(self.master_rect.height())
+            self.rects.append(r)
+            # 위→아래 정렬 후 종료
+            self.rects.sort(key=lambda rr: rr.y())
+            self._emit_norm_and_close()
+            return
+
+        # 프리뷰 갱신
+        preview = self.view_pixmap.copy()
+        p = QPainter(preview)
+        p.setPen(Qt.red)
+        for rr in self.rects:
+            p.drawRect(self._to_view_rect(rr))
+        p.end()
+        self.label.setPixmap(preview)
+
+    def _current_rect(self):
         if self.start_pos is None or self.drag_pos is None:
             return None
         r = QtCore.QRect(self.start_pos, self.drag_pos).normalized()
-
-        # 두 번째 박스부터는 x, width, height 전부 고정
+        # 두 번째 박스는 마스터 기준 정렬(가로/높이 동일)
         if self.master_rect:
             r.setX(self.master_rect.x())
             r.setWidth(self.master_rect.width())
             r.setHeight(self.master_rect.height())
         return r
 
-    def _on_mouse_release(self, ev):
-        if self.start_pos is None:
-            return
-        self.drag_pos = ev.pos()
-        r = self._current_preview_rect()
-        self.start_pos = None
-        self.drag_pos = None
-        if not r or r.width() <= 0 or r.height() <= 0:
-            self.label.setPixmap(self.base_pixmap)
-            return
-
-        self.rects.append(r)
-        if len(self.rects) == 1:
-            self.master_rect = r  # ✅ 첫 박스 기준
-        elif len(self.rects) >= 2:
-            # 두 번째 박스 높이 동일 강제
-            r.setHeight(self.master_rect.height())
-            # 두 개 모두 정렬 후 정규화 출력
-            self.rects.sort(key=lambda rr: rr.y())
-            self._emit_norm_and_close()
-            return
-
-        # 갱신
-        preview = self.base_pixmap.copy()
-        p = QPainter(preview)
-        p.setPen(Qt.red)
-        for rr in self.rects:
-            p.drawRect(rr)
-        p.end()
-        self.label.setPixmap(preview)
-
-    def _on_mouse_release(self, ev):
-        if self.start_pos is None:
-            return
-        self.drag_pos = ev.pos()
-        r = self._current_preview_rect()
-        self.start_pos = None
-        self.drag_pos = None
-        if not r or r.width() <= 0 or r.height() <= 0:
-            # 무효 드래그
-            self.label.setPixmap(self.base_pixmap)
-            return
-
-        self.rects.append(r)
-        if len(self.rects) == 1:
-            self.master_rect = r  # ✅ 첫 박스를 마스터로 저장
-        elif len(self.rects) >= 2:
-            # 두 개 모두 그려졌으면 정렬(위→아래) 후 출력
-            self.rects.sort(key=lambda rr: rr.y())
-            self._emit_norm_and_close()
-            return
-
-        # 갱신
-        preview = self.base_pixmap.copy()
-        p = QPainter(preview)
-        p.setPen(Qt.red)
-        for rr in self.rects:
-            p.drawRect(rr)
-        p.end()
-        self.label.setPixmap(preview)
-
     def _emit_norm_and_close(self):
-        W, H = self.base_pixmap.width(), self.base_pixmap.height()
+        W, H = self.orig_w, self.orig_h
         norms = []
         for rr in self.rects[:2]:
             nx = rr.x() / W
@@ -196,8 +190,7 @@ class FrameEditorDialog(QtWidgets.QDialog):
             nw = rr.width() / W
             nh = rr.height() / H
             norms.append((round(nx, 4), round(ny, 4), round(nw, 4), round(nh, 4)))
-
-        self.norms = norms  # ⬅ 결과 보관
+        self.norms = norms
         QtWidgets.QApplication.clipboard().setText(str(norms))
         print("✅ frame_boxes_norm:", norms)
         self.accept()
@@ -221,11 +214,27 @@ class MainWindow(QtWidgets.QMainWindow):
         self.pages = []
         self.captured_png_bytes = None
 
+        self.CANVAS_W = 1181  # px  (100 mm @ 300 DPI)
+        self.CANVAS_H = 1748  # px  (148 mm @ 300 DPI)
+
         self.frame_template_paths = [
             resource_path("frame_1.png"),
             resource_path("frame_2.png"),
         ]
-        self.frame_templates = [QPixmap(p) for p in self.frame_template_paths]
+        self.frame_templates = []
+        for p in self.frame_template_paths:
+            pm = QPixmap(p)
+            if pm.isNull():
+                pm = QPixmap(self.CANVAS_W, self.CANVAS_H)
+                pm.fill(Qt.black)
+            # 템플릿을 정확히 캔버스 크기로 맞춤 (왜곡 방지하려면 Expanding 후 center-crop로 바꿔도 됨)
+            pm = pm.scaled(
+                self.CANVAS_W,
+                self.CANVAS_H,
+                Qt.IgnoreAspectRatio,
+                Qt.SmoothTransformation,
+            )
+            self.frame_templates.append(pm)
 
         for ui_path in sorted(glob.glob(resource_path("ui/*.ui"))):
             w = uic.loadUi(ui_path)
@@ -290,7 +299,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         POSE_PROMPTS = [
             "Use @orig and @aged as two distinct people standing side by side. Both give a thumbs-up with their right hands. Keep each person’s facial identity, hairstyle, clothing vibe, and age consistent with their own reference. Medium shot, straight-on, 1:1 framing, natural indoor lighting. Do not merge faces; keep @orig and @aged clearly separate.",
-            "A realistic selfie composition: @orig holds a smartphone naturally in her right hand and slightly raises it at an upward angle. @aged sits or stands close on the left side, gently leaning toward @orig while both smile and look at the phone screen together. Keep their facial identities, hairstyles, and ages exactly as in the references. Show natural wrist angle and correct phone orientation (no twisted hand). Medium-close shot, 1:1 framing, soft pink background lighting similar to a beauty studio, realistic phone reflection and glow.",
+            "@aged holds a phone in the right hand, raising it slightly upward for a selfie, and makes a V sign with the left hand. @orig stands close beside, also making a V sign. Both look upward toward the phone camera. Shoulder-to-shoulder composition, natural selfie angle, 1:1 framing.",
             "Both @orig and @aged face the camera and form a heart shape together with their hands at chest height. Warm, soft light; medium shot, 1:1 composition. Preserve each identity, hairstyle, clothing vibe, and age from references. Keep them as two distinct people—no merging.",
         ]
 
@@ -307,49 +316,66 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # ui 파일에 아래 두 위젯이 있다고 가정: print_preview(QLabel), btn_print(QPushButton)
         self.print_preview = getattr(page, "print_preview", None)
+        self.btn_home = getattr(page, "btn_home", None)
         self.btn_print = getattr(page, "btn_print", None)
         if self.btn_print:
             self.btn_print.clicked.connect(self._print_final_frame)
+        if self.btn_home:
+            self.btn_home.clicked.connect(lambda: self.goto_page(0))
 
-    def _enter_print_page(self):
+    def _scale_for_print(self, pm: QPixmap, target_size: QSize, mode: str) -> QPixmap:
+        """미리보기/인쇄에서 공통으로 쓰는 스케일 방식"""
+        if mode == "stretch":
+            # 여백/잘림 없이 꽉 채우되 비율 무시 → 왜곡 가능
+            return pm.scaled(target_size, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+        elif mode == "fit":
+            # 비율 유지 + 종이 안에 맞춤 → 잘림 없음, 여백 가능
+            return pm.scaled(target_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        else:
+            # 기존 cover(잘 채우기, 중앙 크롭) – 필요시 유지
+            return pm.scaled(
+                target_size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation
+            )
+
+    def _enter_print_page(self):  # 프린터#
         """6페이지 들어올 때 미리보기 갱신"""
-        if self.print_preview and not self.final_composed_pixmap.isNull():
+        if (
+            self.print_preview
+            and hasattr(self, "final_composed_pixmap")
+            and not self.final_composed_pixmap.isNull()
+        ):
             self._set_pix_to_label(self.print_preview, self.final_composed_pixmap)
 
     def _print_final_frame(self):
-        """버튼 클릭 시 바로 포토프린터로 여백 없이 인쇄"""
         if (
             not hasattr(self, "final_composed_pixmap")
-            or self.final_composed_pixmap.isNull()
-        ):
+        ) or self.final_composed_pixmap.isNull():
             QtWidgets.QMessageBox.warning(self, "오류", "출력할 이미지가 없습니다.")
             return
 
-        printer = QPrinter(QPrinter.HighResolution)
-        printer.setOutputFormat(
-            QPrinter.NativeFormat
-        )  # 실제 프린터 출력 => NativeFormat
-        printer.setPrinterName("ALPDF")  # (선택) 특정 프린터 지정
+        pm = self.final_composed_pixmap
 
-        # 10x15cm 용지 + 여백 0(borderless)
-        printer.setPaperSize(QSizeF(100, 150), QPrinter.Millimeter)
+        printer = QPrinter(QPrinter.HighResolution)
+        printer.setOutputFormat(QPrinter.NativeFormat)
+        printer.setPrinterName("Canon SELPHY CP1300")  # 기본 프린터 쓰면 주석
+
+        # 100×148mm, 테두리 없음(드라이버에서 Borderless 선택)
+        printer.setPaperSize(QSizeF(100, 148), QPrinter.Millimeter)
         printer.setFullPage(True)
         printer.setPageMargins(0, 0, 0, 0, QPrinter.Millimeter)
         printer.setOrientation(QPrinter.Portrait)
         printer.setResolution(300)
 
         painter = QPainter(printer)
-        page = painter.viewport()
-        pm = self.final_composed_pixmap
-        scaled = pm.scaled(page.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        x = (page.width() - scaled.width()) // 2
-        y = (page.height() - scaled.height()) // 2
-
-        painter.drawPixmap(x, y, scaled)
+        # === 포인트: 윈도우 좌표를 "이미지 픽셀 크기"로 설정하여 1:1 매핑 ===
+        painter.setWindow(0, 0, self.CANVAS_W, self.CANVAS_H)
+        painter.drawPixmap(
+            0, 0, pm
+        )  # 스케일 없이 꽉 채움 (드라이버가 그대로 용지에 맞춤)
         painter.end()
 
         QtWidgets.QMessageBox.information(
-            self, "인쇄 완료", "✅ 인생네컷 사진이 바로 출력되었습니다!"
+            self, "인쇄", "✅ 프린터로 전송했습니다. 인쇄가 완료되면 가져가세요."
         )
 
     def _load_frame_boxes(self):
@@ -380,22 +406,27 @@ class MainWindow(QtWidgets.QMainWindow):
         if base.isNull() or not all(self.final_slots):
             return QPixmap()
 
-        # 정규화 박스를 실제 QRect로 변환
-        boxes = self._boxes_from_norm(idx, base)
-
-        canvas = QPixmap(base.size())
+        # 캔버스 생성(최종 출력 크기와 동일)
+        canvas = QPixmap(self.CANVAS_W, self.CANVAS_H)
         canvas.fill(Qt.transparent)
 
         painter = QPainter(canvas)
         painter.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
 
-        # 프레임 그리기
+        # 프레임 먼저 그림 (이미 CANVAS_W×CANVAS_H 크기)
         painter.drawPixmap(0, 0, base)
 
-        # 두 장을 각 박스에 채워 넣기 (비율 유지, 박스 꽉 채우기)
-        slots = [self.final_slots[0], self.final_slots[1]]
+        # 정규화된 박스를 실제 픽셀 좌표로 변환 (캔버스 기준)
+        boxes = []
+        for nx, ny, nw, nh in self.frame_boxes_norm[idx]:
+            x = int(nx * self.CANVAS_W)
+            y = int(ny * self.CANVAS_H)
+            w = int(nw * self.CANVAS_W)
+            h = int(nh * self.CANVAS_H)
+            boxes.append(QRect(x, y, max(1, w), max(1, h)))
 
-        for slot_pix, rect in zip(slots, boxes):
+        # 두 장을 각 박스에 "꽉 채우기" (비율 유지, center-crop)
+        for slot_pix, rect in zip([self.final_slots[0], self.final_slots[1]], boxes):
             if isinstance(slot_pix, QPixmap) and not slot_pix.isNull():
                 scaled = slot_pix.scaled(
                     rect.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation
@@ -947,7 +978,7 @@ class MainWindow(QtWidgets.QMainWindow):
             getattr(page, "frame_opt_2", None),
         ]
 
-        self._frame_thumb_style = "border: 2px solid transparent; background:#000;"
+        self._frame_thumb_style = "border: 2px solid transparent;"
         self._frame_thumb_selected = "border: 2px solid #4CAF50; background:#000;"
 
         for frame in self.frame_opt_labels:

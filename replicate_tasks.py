@@ -26,10 +26,13 @@ class AgeJob(QRunnable):
         )
 
         self.prompt_young = (
-            "Transform the person in the uploaded photo into a younger version, around 20 years old. "
-            "Keep the same facial identity, gender, and hairstyle as in the original photo. "
-            "Smooth the skin and remove wrinkles naturally while preserving the person’s features. "
-            "Render as a photorealistic high-quality portrait with soft lighting and neutral background."
+            "Make the person look like a very youthful young adult in their early teenager, "
+            "with bright, smooth skin and lively facial expression. "
+            "Preserve the same facial identity and gender. "
+            "Give a fresh, energetic appearance reminiscent of a high school student, "
+            "with naturally fuller cheeks, clear eyes, and vibrant hair color. "
+            "Maintain a realistic adult face "
+            "Photorealistic high-quality portrait with soft daylight tone and gentle contrast."
         )
 
     def _to_data_uri_from_bytes(self, png_bytes: bytes) -> str:
