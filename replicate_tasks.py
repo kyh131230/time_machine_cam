@@ -19,20 +19,19 @@ class AgeJob(QRunnable):
         self.signals = WorkerSignals()
 
         self.prompt_old = (
-            "Transform the person in the uploaded photo into an adult version, around 30 years old. "
+            "Transform the person in the uploaded photo into an korean adult version, around 25 years old. "
             "Make the face look slightly more mature while keeping the same identity, gender, and hairstyle. "
             "Add subtle adult facial proportions and natural skin texture without wrinkles. "
             "Render as a realistic, high-quality studio portrait with soft lighting and neutral background."
         )
 
         self.prompt_young = (
-            "Make the person look like a very youthful young adult in their early teenager, "
-            "with bright, smooth skin and lively facial expression. "
-            "Preserve the same facial identity and gender. "
-            "Give a fresh, energetic appearance reminiscent of a high school student, "
-            "with naturally fuller cheeks, clear eyes, and vibrant hair color. "
-            "Maintain a realistic adult face "
-            "Photorealistic high-quality portrait with soft daylight tone and gentle contrast."
+            "Make the person look like a youthful Korean young adult with a fresh, lively appearance. "
+            "Keep the same facial identity and gender, but remove wrinkles and signs of aging. "
+            "Smooth the skin naturally and brighten the eyes for a healthy, energetic expression. "
+            "Give the look and vibe of a college-age person in Korea, with soft clear skin and natural dark hair. "
+            "Maintain realistic proportions and a natural facial structure. "
+            "Render as a photorealistic high-quality portrait under soft daylight."
         )
 
     def _to_data_uri_from_bytes(self, png_bytes: bytes) -> str:

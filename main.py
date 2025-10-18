@@ -305,6 +305,95 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.pose_prompts = POSE_PROMPTS
 
+    def _reset_ui_state(self):
+        """홈으로 돌아올 때 '최초 실행 상태'로 되돌리기 (카메라는 유지)."""
+        # --- 모드 선택 라벨 초기화 ---
+        self._selected_mode_idx = None
+        self.selected_mode = None
+        # next 버튼 비활성화
+        if hasattr(self, "_mode_next_btn") and self._mode_next_btn:
+            self._mode_next_btn.setEnabled(False)
+        # 라벨 스타일 초기화
+        if (
+            hasattr(
+                self,
+                "past_label",
+            )
+            and self.past_label
+        ):
+            self.past_label.setProperty("selected", "false")
+            self.past_label.style().unpolish(self.past_label)
+            self.past_label.style().polish(self.past_label)
+            self.past_label.update()
+        if hasattr(self, "future_label") and self.future_label:
+            self.future_label.setProperty("selected", "false")
+            self.future_label.style().unpolish(self.future_label)
+            self.future_label.style().polish(self.future_label)
+            self.future_label.update()
+
+        # --- 캡처/AI 파이프라인 상태 초기화 (카메라 off 안 함) ---
+        self.ai_running = False
+        self.poses_left = 0
+        self._pose_done_count = 0
+        self.candidates = []
+        self.final_slots = [None, None]
+        self.slot_source = [None, None]
+        self.captured_png_bytes = None
+        self.captures = []
+
+        # 캡처 페이지 라벨/진행표시 리셋
+        if hasattr(self, "lbl_countdown") and self.lbl_countdown:
+            self.lbl_countdown.setText("여기를 봐주세요")
+        if hasattr(self, "lbl_progress") and self.lbl_progress:
+            self.lbl_progress.setText(f"0 / {getattr(self, 'capture_target_count', 1)}")
+        if hasattr(self, "btn_next_on_capture") and self.btn_next_on_capture:
+            self.btn_next_on_capture.setEnabled(False)
+
+        # --- pick2 페이지 UI 리셋 ---
+        if hasattr(self, "sel_labels"):
+            for lbl in self.sel_labels:
+                if lbl:
+                    lbl.clear()
+                    lbl.setText("여기에 선택")
+                    lbl.setStyleSheet(
+                        self._empty_style if hasattr(self, "_empty_style") else ""
+                    )
+        if hasattr(self, "thumb_labels"):
+            for lbl in self.thumb_labels:
+                if lbl:
+                    lbl.clear()
+                    lbl.setEnabled(False)
+                    lbl.setStyleSheet(
+                        self._thumb_disabled if hasattr(self, "_thumb_disabled") else ""
+                    )
+
+        if hasattr(self, "pick2_next_btn") and self.pick2_next_btn:
+            self.pick2_next_btn.setEnabled(False)
+
+        # --- 프레임 선택/미리보기 리셋 ---
+        self.selected_frame_index = 0
+        if hasattr(self, "frame_preview") and self.frame_preview:
+            self.frame_preview.clear()
+        if hasattr(self, "frame_opt_labels"):
+            for i, frame in enumerate(self.frame_opt_labels):
+                if frame:
+                    # 썸네일 원래대로
+                    frame.setStyleSheet(
+                        self._frame_thumb_style
+                        if hasattr(self, "_frame_thumb_style")
+                        else ""
+                    )
+                    if (
+                        i < len(getattr(self, "frame_templates", []))
+                        and not self.frame_templates[i].isNull()
+                    ):
+                        self._set_pix_to_label(frame, self.frame_templates[i])
+        self.final_composed_pixmap = QPixmap()
+
+        # --- 인쇄 페이지 미리보기 리셋 ---
+        if hasattr(self, "print_preview") and self.print_preview:
+            self.print_preview.clear()
+
     def _setup_print_page(self):
         """6번째 인쇄 페이지 초기 설정"""
         self.print_page_index = None
@@ -641,7 +730,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             if hasattr(self, "_last_frame_bgr") and self._last_frame_bgr is not None:
                 success, buf = cv2.imencode(
-                    ".png", cv2.imread("img/senior(male).png")
+                    ".png", cv2.imread("senior(male).png")
                 )  # self._last_frame_bgr로 교체
                 if success:
                     self.captured_png_bytes = bytes(buf)
@@ -1076,6 +1165,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def goto_page(self, index: int):
         if 0 <= index < self.stacked.count():
+
+            if index == 0:
+                self._reset_ui_state()
 
             if (
                 hasattr(self, "capture_page_index")
