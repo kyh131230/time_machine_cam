@@ -670,38 +670,71 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _write_mode_buttons(self):
         target = None
+
         for page in self.pages:
-            if hasattr(page, "btn_past") and hasattr(page, "btn_future"):
+            if hasattr(page, "past_label") and hasattr(page, "future_label"):
                 target = page
-                self.btn_past = page.btn_past
-                self.btn_future = page.btn_future
+                self.past_label = page.past_label
+                self.future_label = page.future_label
                 break
 
-        self.btn_past.setCheckable(True)
-        self.btn_future.setCheckable(True)
+        self._selected_mode_idx = None
 
-        self.mode_group = QButtonGroup(self)
-        self.mode_group.setExclusive(True)
-        self.mode_group.addButton(self.btn_past, 0)
-        self.mode_group.addButton(self.btn_future, 1)
+        self.past_label.clicked.connect(lambda: self._on_label_mode_clicked(0))
+        self.future_label.clicked.connect(lambda: self._on_label_mode_clicked(1))
 
         target.setStyleSheet(
             """
-            QPushButton#btn_past:checked,
-            QPushButton#btn_future:checked {
-                background-color: #4CAF50;
+            /* ✅ 선택된 상태 */
+            QLabel#past_label[selected="true"],
+            QLabel#future_label[selected="true"],
+            *#past_label[selected="true"],
+            *#future_label[selected="true"] {
+                background-color: transparent;        
                 color: white;
-                border: 2px solid #388E3C;
+                border: 20px solid #FA8072;
+                border-radius: 50px;
+            }
+
+            /* ✅ 마우스 오버(hover) 시 — 살짝 더 밝게 */
+            QLabel#past_label:hover,
+            QLabel#future_label:hover,
+            *#past_label:hover,
+            *#future_label:hover {
+                background-color: #E9967A;        
+                color: white;
+                border-radius: 6px;
+                cursor: pointer;                  
             }
         """
         )
 
-        self.mode_group.buttonClicked[int].connect(self._on_mode_chosen)
-
         btn_next = getattr(target, "btn_next", None)
+
         if btn_next:
             btn_next.setEnabled(False)
             self._mode_next_btn = btn_next
+            self._update_mode_label_styles()
+
+    def _on_label_mode_clicked(self, idx: int):
+        # 예전 `_on_mode_chosen(0/1)` 동작을 그대로 사용
+        self._selected_mode_idx = idx
+        self._on_mode_chosen(idx)  # 기존 코드: self.selected_mode 설정 + next enable
+        self._update_mode_label_styles()
+
+    def _update_mode_label_styles(self):
+        for i, lbl in enumerate(
+            [getattr(self, "past_label", None), getattr(self, "future_label", None)]
+        ):
+            if not lbl:
+                continue
+            lbl.setProperty(
+                "selected", "true" if i == self._selected_mode_idx else "false"
+            )
+            # 동적 property 반영
+            lbl.style().unpolish(lbl)
+            lbl.style().polish(lbl)
+            lbl.update()
 
     def _on_mode_chosen(self, mode_id: int):
         # mode_id == 0(past), mode_id ==1(future)
