@@ -792,8 +792,7 @@ class MainWindow(QtWidgets.QMainWindow):
             *#future_label:hover {
                 background-color: #E9967A;        
                 color: white;
-                border-radius: 6px;
-                cursor: pointer;                  
+                border-radius: 6px;                
             }
         """
         )
