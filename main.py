@@ -808,27 +808,28 @@ class MainWindow(QtWidgets.QMainWindow):
 
         target.setStyleSheet(
             """
-            /* ✅ 선택된 상태 */
+            /* ✅ 선택된 상태 — 배경이 강조됨 */
             QLabel#past_label[selected="true"],
             QLabel#future_label[selected="true"],
             *#past_label[selected="true"],
             *#future_label[selected="true"] {
-                background-color: transparent;        
+                background-color: #FA8072;     /* 선택 시 배경 강조 */
                 color: white;
-                border: 20px solid #FA8072;
-                border-radius: 50px;
+                border: 2px solid #FA8072;
+                border-radius: 12px;
             }
 
-            /* ✅ 마우스 오버(hover) 시 — 살짝 더 밝게 */
+            /* ✅ 마우스 오버(hover) 시 — 테두리만 표시 */
             QLabel#past_label:hover,
             QLabel#future_label:hover,
             *#past_label:hover,
             *#future_label:hover {
-                background-color: #E9967A;        
-                color: white;
-                border-radius: 6px;                
+                background-color: transparent;
+                color: #FA8072;
+                border: 10px solid #FA8072;     /* hover 시 테두리 강조 */
+                border-radius: 12px;
             }
-        """
+            """
         )
 
         btn_next = getattr(target, "btn_next", None)
