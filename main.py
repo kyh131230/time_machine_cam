@@ -303,7 +303,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         POSE_PROMPTS = [
             "@personA and @personB stand side by side, both smiling and giving a thumbs-up with one hand. Keep @personA and @personB identical to their references (no merging or replacement). Shoulder-to-shoulder, clear front view, 1:1 framing, natural light.",
-            "@personA holds a phone above head level with the right hand for a selfie, while @personB stands close beside making a V sign with one hand. Both look toward the phone. Shoulder-to-shoulder, 1:1 framing. not face and hand distortion",
+            "@personA holds smartphone above head level with the right hand for a selfie, while @personB stands close beside making a V sign with one hand. Both look toward the smartphone. Shoulder-to-shoulder, 1:1 framing. not face and hand distortion",
             "@personA and @personB each use one hand to form a heart shape together. Shoulder-to-shoulder, 1:1 framing.",
         ]
 
@@ -636,10 +636,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         QtWidgets.QApplication.processEvents()
 
-    def _update_progress(self, value):
+    def _update_progress(self, text, value):
         if hasattr(self, "progress_dlg") and self.progress_dlg.isVisible():
             self.progress_bar.setValue(int(value))
-            self.progress_label.setText(f"AI 이미지 변환 중… {int(value)}%")
+            self.progress_label.setText(f"{text} … {int(value)}%")
             QtWidgets.QApplication.processEvents()
 
     def _hide_progress(self):
@@ -1109,12 +1109,12 @@ class MainWindow(QtWidgets.QMainWindow):
             self._age_weight
             + min(self._pose_done_count, len(self.pose_prompts)) * self._pose_per
         )
-        self._update_progress(progress)
+        self._update_progress("타임머신 완료, 포즈 생성 중", progress)
 
         self.poses_left -= 1
         if self.poses_left <= 0:
             self.ai_running = False
-            self._update_progress(100)
+            self._update_progress("변환이 완료되었습니다.", 100)
             self._hide_progress()
             if self.pick2_page_index is not None:
                 self.goto_page(self.pick2_page_index)
