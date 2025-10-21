@@ -1,0 +1,15 @@
+/* QPushButton style */
+
+QMainWindow {
+    background-color: white;
+}
+
+QLabel{
+    font-family: 'Maple Story';
+}
+
+QPushButton
+{
+    font-family: 'Maple Story';
+    font-size: 20px
+}

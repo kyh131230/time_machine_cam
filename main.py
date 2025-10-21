@@ -13,7 +13,7 @@ from PyQt5.QtCore import (
     QMarginsF,
 )
 from PyQt5 import QtCore
-from PyQt5.QtGui import QImage, QPixmap, QPainter, QPageSize, QPageLayout
+from PyQt5.QtGui import QImage, QPixmap, QPainter, QFont, QFontDatabase
 from setting import FileController
 from replicate_tasks import AgeJob, PoseJob
 import numpy as np
@@ -21,6 +21,7 @@ import json
 from PyQt5.QtPrintSupport import QPrinter
 from PyQt5.QtCore import QSizeF, QSize
 from qr import QRCODE
+from PyQt5.QtCore import QFile, QTextStream
 
 
 def resource_path(rel_path: str) -> str:
@@ -308,6 +309,48 @@ class MainWindow(QtWidgets.QMainWindow):
         ]
 
         self.pose_prompts = POSE_PROMPTS
+
+        self._load_stylesheet()
+
+    def _load_stylesheet(self):
+        # stylesheet.qss 파일 로드
+        self.setStyleSheet("")
+        qss_file_path = resource_path("style/stylesheet.qss")
+        qss_file = QFile(qss_file_path)
+        qss_file.open(QFile.ReadOnly | QFile.Text)
+        qss_stream = QTextStream(qss_file)
+        qss_stream_all = qss_stream.readAll()
+        qss_file.close()
+
+        font_path = resource_path("style/font/Maplestory Light.ttf")  # 폰트 파일 경로
+        font_name = self._load_external_font(font_path)
+
+        if font_name:
+            # QSS에서 폰트 이름 대체
+            qss_stream_all = qss_stream_all.replace("Maple Story", font_name)
+
+            # 기존 스타일 초기화 후 새 스타일 적용
+            self.setStyleSheet("")
+            self.setStyleSheet(qss_stream_all)
+
+            # 프로그램적으로 폰트 설정 (필요시)
+            font = QFont(font_name)
+            font.setPointSize(16)
+            self.setFont(font)
+        else:
+            self.setStyleSheet(qss_stream_all)
+
+    def _load_external_font(self, font_path):
+        font_id = QFontDatabase.addApplicationFont(font_path)
+        if font_id == -1:
+            print(f"폰트를 로드하지 못했습니다: {font_path}")
+            return ""
+        font_families = QFontDatabase.applicationFontFamilies(font_id)
+        if font_families:
+            return font_families[0]
+        else:
+            print("등록된 폰트 이름을 가져오지 못했습니다.")
+            return ""
 
     def _reset_ui_state(self):
         """홈으로 돌아올 때 '최초 실행 상태'로 되돌리기 (카메라는 유지)."""
