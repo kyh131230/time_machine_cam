@@ -20,6 +20,7 @@ import numpy as np
 import json
 from PyQt5.QtPrintSupport import QPrinter
 from PyQt5.QtCore import QSizeF, QSize
+from qr import QRCODE
 
 
 def resource_path(rel_path: str) -> str:
@@ -204,6 +205,8 @@ class MainWindow(QtWidgets.QMainWindow):
             os.path.dirname(__file__), "frame_boxes.json"
         )
 
+        self.qr = QRCODE()
+
         self.ai_running = False
         self.poses_left = 0
 
@@ -265,6 +268,7 @@ class MainWindow(QtWidgets.QMainWindow):
         ]
 
         self.final_composed_pixmap = QPixmap()
+        self.qrcode_pixmap = None
 
         self._load_frame_boxes()
 
@@ -298,9 +302,9 @@ class MainWindow(QtWidgets.QMainWindow):
             os.environ["REPLICATE_API_TOKEN"] = self.replicate_token
 
         POSE_PROMPTS = [
-            "Use @orig and @aged as two distinct people standing side by side. Both give a thumbs-up with their right hands. Keep each person’s facial identity, hairstyle, clothing vibe, and age consistent with their own reference. Medium shot, straight-on, 1:1 framing, natural indoor lighting. Do not merge faces; keep @orig and @aged clearly separate.",
-            "@aged holds a phone above head level with the right hand for a selfie, while @orig stands close beside making a V sign with one hand. Both look toward the phone. Shoulder-to-shoulder, 1:1 framing. not face and hand distortion",
-            "@orig and @aged each use one hand to form a heart shape together. Shoulder-to-shoulder, 1:1 framing.",
+            "@personA and @personB stand side by side, both smiling and giving a thumbs-up with one hand. Keep @personA and @personB identical to their references (no merging or replacement). Shoulder-to-shoulder, clear front view, 1:1 framing, natural light.",
+            "@personA holds a phone above head level with the right hand for a selfie, while @personB stands close beside making a V sign with one hand. Both look toward the phone. Shoulder-to-shoulder, 1:1 framing. not face and hand distortion",
+            "@personA and @personB each use one hand to form a heart shape together. Shoulder-to-shoulder, 1:1 framing.",
         ]
 
         self.pose_prompts = POSE_PROMPTS
@@ -394,6 +398,14 @@ class MainWindow(QtWidgets.QMainWindow):
         if hasattr(self, "print_preview") and self.print_preview:
             self.print_preview.clear()
 
+        # --- ✅ QR 상태 초기화 추가 ---
+        self.qrcode_pixmap = None
+        if hasattr(self, "qrcode_label") and self.qrcode_label:
+            self.qrcode_label.clear()
+            self.qrcode_label.setToolTip("")
+        if hasattr(self, "qr"):
+            self.qr = QRCODE()  # 새 인스턴스로 교체해서 URL 중복 방지
+
     def _setup_print_page(self):
         """6번째 인쇄 페이지 초기 설정"""
         self.print_page_index = None
@@ -407,6 +419,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.print_preview = getattr(page, "print_preview", None)
         self.btn_home = getattr(page, "btn_home", None)
         self.btn_print = getattr(page, "btn_print", None)
+        self.qrcode_label = getattr(page, "qrcode_label", None)
+
         if self.btn_print:
             self.btn_print.clicked.connect(self._print_final_frame)
         if self.btn_home:
@@ -426,7 +440,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 target_size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation
             )
 
-    def _enter_print_page(self):  # 프린터#
+    def _enter_print_page(self):  # 프린터
         """6페이지 들어올 때 미리보기 갱신"""
         if (
             self.print_preview
@@ -434,6 +448,26 @@ class MainWindow(QtWidgets.QMainWindow):
             and not self.final_composed_pixmap.isNull()
         ):
             self._set_pix_to_label(self.print_preview, self.final_composed_pixmap)
+
+        # ⬇️ 여기 조건 간단히: 라벨만 있으면 생성/표시 시도
+        if getattr(self, "qrcode_label", None):
+            try:
+                # QRCODE 인스턴스가 없다면 만들어두기
+                if not hasattr(self, "qr") or self.qr is None:
+                    self.qr = QRCODE()
+
+                qr_path, page_url = self.qr.run(self.final_composed_pixmap)
+
+                # 생성된 QR 이미지를 라벨에 표시 (헬퍼 재사용)
+                self.qrcode_pixmap = QPixmap(qr_path)
+                if not self.qrcode_pixmap.isNull():
+                    self._set_pix_to_label(self.qrcode_label, self.qrcode_pixmap)
+                    self.qrcode_label.setToolTip(page_url)
+                else:
+                    print("⚠️ QR 이미지 로드 실패:", qr_path)
+
+            except Exception as e:
+                print("QR 생성 실패:", e)
 
     def _print_final_frame(self):
         if (
@@ -730,7 +764,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             if hasattr(self, "_last_frame_bgr") and self._last_frame_bgr is not None:
                 success, buf = cv2.imencode(
-                    ".png", cv2.imread("senior(male).png")
+                    ".png", cv2.imread("teen_test.jpeg")
                 )  # self._last_frame_bgr로 교체
                 if success:
                     self.captured_png_bytes = bytes(buf)
@@ -1128,10 +1162,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.frame_next_btn = getattr(page, "btn_next", None)
         if self.frame_next_btn:
             self.frame_next_btn.clicked.connect(
-                lambda: (
-                    self.goto_page(self.print_page_index),
-                    self._enter_print_page(),
-                )
+                lambda: (self.goto_page(self.print_page_index),)
             )
 
     def _open_frame_editor(self):
