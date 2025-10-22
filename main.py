@@ -341,7 +341,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.setStyleSheet(qss_stream_all)
 
         cursor_path = resource_path("style/cursor/nyj.png")
-        print(cursor_path, os.path.exists(cursor_path))
         cursor_pixmap = QPixmap(cursor_path).scaled(
             64,
             64,  # 가로, 세로 크기
