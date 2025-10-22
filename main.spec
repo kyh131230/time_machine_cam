@@ -2,7 +2,7 @@ from PyInstaller.utils.hooks import collect_submodules, copy_metadata
 
 # -*- mode: python ; coding: utf-8 -*-
 
-datas = [('ui/*', 'ui/'), ('style/*', 'style/'), ('img/*', 'img/'), ('style/cursor/*', 'style/cursor'), ('style/font/*', 'style/font'), ('clickable_label.py', '.'), ('qr.py', '.'), ('replicate_tasks.py', '.'),
+datas = [('ui/*', 'ui/'), ('style/*', 'style/'), ('img/*', 'img/'), ('style/cursor/*', 'style/cursor'), ('style/font/*', 'style/font'), ('clickable_label.py', '.'), ('qr.py', '.'), ('replicate_tasks.py', '.'),('frame_boxes.json', '.'),
 ('setting.py', '.'),('senior(male).png', '.'), ]
 
 hiddenimports=[]
