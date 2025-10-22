@@ -13,7 +13,7 @@ from PyQt5.QtCore import (
     QMarginsF,
 )
 from PyQt5 import QtCore
-from PyQt5.QtGui import QImage, QPixmap, QPainter, QFont, QFontDatabase
+from PyQt5.QtGui import QImage, QPixmap, QPainter, QFont, QFontDatabase, QCursor
 from setting import FileController
 from replicate_tasks import AgeJob, PoseJob
 import numpy as np
@@ -339,6 +339,18 @@ class MainWindow(QtWidgets.QMainWindow):
             self.setFont(font)
         else:
             self.setStyleSheet(qss_stream_all)
+
+        cursor_path = resource_path("style/cursor/nyj.png")
+        print(cursor_path, os.path.exists(cursor_path))
+        cursor_pixmap = QPixmap(cursor_path).scaled(
+            64,
+            64,  # 가로, 세로 크기
+            Qt.KeepAspectRatio,  # 비율 유지
+            Qt.SmoothTransformation,  # 부드럽게 스케일링
+        )
+
+        cursor = QCursor(cursor_pixmap, 0, 0)
+        QApplication.setOverrideCursor(cursor)
 
     def _load_external_font(self, font_path):
         font_id = QFontDatabase.addApplicationFont(font_path)
