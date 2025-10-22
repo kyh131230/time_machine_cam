@@ -107,7 +107,7 @@
           </font>
          </property>
          <property name="text">
-          <string>엄지척</string>
+          <string>엄지 척</string>
          </property>
          <property name="alignment">
           <set>Qt::AlignCenter</set>
@@ -142,7 +142,7 @@
           </font>
          </property>
          <property name="text">
-          <string>셀카 촬영</string>
+          <string>셀피</string>
          </property>
          <property name="alignment">
           <set>Qt::AlignCenter</set>
@@ -177,7 +177,7 @@
           </font>
          </property>
          <property name="text">
-          <string>하트 모양</string>
+          <string>손 하트</string>
          </property>
          <property name="alignment">
           <set>Qt::AlignCenter</set>

@@ -807,7 +807,7 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             return
 
-        self.count_left = 1
+        self.count_left = 5
         if self.lbl_countdown:
             self.lbl_countdown.setText(str(self.count_left))
         self.countdown_timer.start(1000)
