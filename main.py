@@ -340,15 +340,22 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             self.setStyleSheet(qss_stream_all)
 
-        cursor_path = resource_path("style/cursor/nyj.png")
-        cursor_pixmap = QPixmap(cursor_path).scaled(
-            64,
-            64,  # 가로, 세로 크기
-            Qt.KeepAspectRatio,  # 비율 유지
-            Qt.SmoothTransformation,  # 부드럽게 스케일링
+        cursor = QPixmap(resource_path("style/cursor/nyj.png"))
+        orig_w, orig_h = cursor.width(), cursor.height()
+        orig_hot_x, orig_hot_y = 357, 524
+
+        scaled_w, scaled_h = 64, 64
+        cursor_pixmap = cursor.scaled(
+            scaled_w,
+            scaled_h,
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation,
         )
 
-        cursor = QCursor(cursor_pixmap, 0, 0)
+        hot_x = int(orig_hot_x * scaled_w / orig_w)
+        hot_y = int(orig_hot_y * scaled_h / orig_h)
+
+        cursor = QCursor(cursor_pixmap, hot_x, hot_y)
         QApplication.setOverrideCursor(cursor)
 
     def _load_external_font(self, font_path):
@@ -818,7 +825,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             if hasattr(self, "_last_frame_bgr") and self._last_frame_bgr is not None:
                 success, buf = cv2.imencode(
-                    ".png", cv2.imread(resource_path("img/test.png"))
+                    ".png", cv2.imread(resource_path("teen_ager(female).png"))
                 )  # self._last_frame_bgr로 교체
                 if success:
                     self.captured_png_bytes = bytes(buf)
