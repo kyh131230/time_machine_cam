@@ -11,7 +11,7 @@ QLabel {
 /* === 공통 버튼 스타일 === */
 QPushButton {
     font-family: 'Maple Story';
-    font-size: 18px;
+    font-size: 30px;
     font-weight: 500;
     color: #FFF;
     background-color: #D2691E;      /* 초콜릿 브라운 */

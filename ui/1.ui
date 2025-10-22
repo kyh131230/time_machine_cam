@@ -27,6 +27,11 @@
          <height>60</height>
         </size>
        </property>
+       <property name="font">
+        <font>
+         <pointsize>30</pointsize>
+        </font>
+       </property>
        <property name="text">
         <string>다음</string>
        </property>

@@ -101,6 +101,11 @@
            <height>40</height>
           </size>
          </property>
+         <property name="font">
+          <font>
+           <pointsize>20</pointsize>
+          </font>
+         </property>
          <property name="text">
           <string>엄지척</string>
          </property>
@@ -131,6 +136,11 @@
        </item>
        <item>
         <widget class="QLabel" name="label_7">
+         <property name="font">
+          <font>
+           <pointsize>20</pointsize>
+          </font>
+         </property>
          <property name="text">
           <string>셀카 촬영</string>
          </property>
@@ -161,6 +171,11 @@
        </item>
        <item>
         <widget class="QLabel" name="label_9">
+         <property name="font">
+          <font>
+           <pointsize>20</pointsize>
+          </font>
+         </property>
          <property name="text">
           <string>하트 모양</string>
          </property>
@@ -181,6 +196,11 @@
        <height>60</height>
       </size>
      </property>
+     <property name="font">
+      <font>
+       <pointsize>30</pointsize>
+      </font>
+     </property>
      <property name="text">
       <string>이전</string>
      </property>
@@ -193,6 +213,11 @@
        <width>200</width>
        <height>60</height>
       </size>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>30</pointsize>
+      </font>
      </property>
      <property name="text">
       <string>다음</string>
