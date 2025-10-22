@@ -1,15 +1,86 @@
-/* QPushButton style */
-
+/* === 기본 배경, 폰트 === */
 QMainWindow {
-    background-color: white;
+    background-color: #E8DCC5; /* 따뜻한 아이보리톤 */
 }
 
-QLabel{
+QLabel {
     font-family: 'Maple Story';
+    color: #4B3B2B;
 }
 
-QPushButton
-{
+/* === 공통 버튼 스타일 === */
+QPushButton {
     font-family: 'Maple Story';
-    font-size: 20px
+    font-size: 18px;
+    font-weight: 500;
+    color: #FFF;
+    background-color: #D2691E;      /* 초콜릿 브라운 */
+    border: none;
+    border-radius: 10px;
+    padding: 10px 18px;
+    min-width: 100px;
+}
+
+QPushButton:hover {
+    background-color: #E07B39;      /* 약간 밝은 오렌지 브라운 */
+}
+
+QPushButton:pressed {
+    background-color: #B85C1E;      /* 눌렀을 때 진한 브라운 */
+}
+
+/* === 뒤로가기 버튼 (btn_back) — 차분한 올리브 톤 === */
+QPushButton#btn_back {
+    background-color: #8B7355;
+    color: #FFF;
+}
+QPushButton#btn_back:hover {
+    background-color: #A68966;
+}
+QPushButton#btn_back:pressed {
+    background-color: #6F5A41;
+}
+
+/* === 다음 버튼 (btn_next) — 부드러운 브론즈 오렌지톤 === */
+QPushButton#btn_next {
+    background-color: #C97B4E;   /* 부드러운 브론즈 오렌지 */
+    color: #FFF;
+}
+
+QPushButton#btn_next:hover {
+    background-color: #D89263;   /* 밝은 라이트 테라코타 */
+}
+
+QPushButton#btn_next:pressed {
+    background-color: #A8653D;   /* 눌렀을 때 진한 브론즈 */
+}
+
+QPushButton#btn_next:disabled {
+    background-color: #D5BCA5;   /* 흐린 베이지톤으로 채도 낮춤 */
+    color: #F0E7DE;              /* 텍스트도 흐리게 */
+    border: none;
+}
+
+/* === 인쇄 버튼 (btn_print) — 진한 카푸치노 톤 === */
+QPushButton#btn_print {
+    background-color: #A0522D;
+    color: #FFF8F0;
+}
+QPushButton#btn_print:hover {
+    background-color: #B86B4B;
+}
+QPushButton#btn_print:pressed {
+    background-color: #81472B;
+}
+
+/* === 캡처 버튼 (btn_caputre) — 붉은 브릭 컬러로 포인트 === */
+QPushButton#btn_caputre {
+    background-color: #C04B3E;
+    color: #FFF;
+}
+QPushButton#btn_caputre:hover {
+    background-color: #D35C4F;
+}
+QPushButton#btn_caputre:pressed {
+    background-color: #9E3A2F;
 }

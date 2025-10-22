@@ -851,28 +851,28 @@ class MainWindow(QtWidgets.QMainWindow):
 
         target.setStyleSheet(
             """
-            /* ✅ 선택된 상태 — 배경이 강조됨 */
-            QLabel#past_label[selected="true"],
-            QLabel#future_label[selected="true"],
-            *#past_label[selected="true"],
-            *#future_label[selected="true"] {
-                background-color: #FA8072;     /* 선택 시 배경 강조 */
-                color: white;
-                border: 2px solid #FA8072;
-                border-radius: 12px;
-            }
+        /* ✅ 선택된 상태 — 배경이 강조됨 */
+        QLabel#past_label[selected="true"],
+        QLabel#future_label[selected="true"],
+        *#past_label[selected="true"],
+        *#future_label[selected="true"] {
+            background-color: #C97B4E;     /* 브론즈 오렌지 */
+            color: #FFF;
+            border: 10px solid #C97B4E;
+            border-radius: 12px;
+        }
 
-            /* ✅ 마우스 오버(hover) 시 — 테두리만 표시 */
-            QLabel#past_label:hover,
-            QLabel#future_label:hover,
-            *#past_label:hover,
-            *#future_label:hover {
-                background-color: transparent;
-                color: #FA8072;
-                border: 10px solid #FA8072;     /* hover 시 테두리 강조 */
-                border-radius: 12px;
-            }
-            """
+        /* ✅ 마우스 오버(hover) 시 — 테두리만 표시 */
+        QLabel#past_label:hover,
+        QLabel#future_label:hover,
+        *#past_label:hover,
+        *#future_label:hover {
+            background-color: transparent;
+            color: #C97B4E;
+            border: 10px solid #C97B4E;     /* hover 시 부드러운 브론즈 테두리 */
+            border-radius: 12px;
+        }
+        """
         )
 
         btn_next = getattr(target, "btn_next", None)
@@ -1177,8 +1177,25 @@ class MainWindow(QtWidgets.QMainWindow):
             getattr(page, "frame_opt_2", None),
         ]
 
-        self._frame_thumb_style = "border: 2px solid transparent;"
-        self._frame_thumb_selected = "border: 2px solid #4CAF50; background:#000;"
+        self._frame_thumb_style = """
+            QFrame {
+                border: 2px solid transparent;
+                border-radius: 12px;
+                background-color: transparent;
+            }
+            QFrame:hover {
+                border: 2px solid #FA8072;
+                background-color: rgba(250, 128, 114, 0.1); /* 살짝 밝은 살구빛 */
+            }
+            """
+
+        self._frame_thumb_selected = """
+        QFrame {
+            border: 2px solid #FA8072;
+            border-radius: 12px;
+            background-color: #FA8072;
+        }
+        """
 
         for frame in self.frame_opt_labels:
             if frame:
