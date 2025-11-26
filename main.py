@@ -296,7 +296,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.pool = QThreadPool().globalInstance()
 
-        self.camera_port = FileController().load_json().get("CAMERA_PORT", "") ## 카메라 포트 json 추가
+        self.camera_port = (
+            FileController().load_json().get("CAMERA_PORT", "")
+        )  ## 카메라 포트 json 추가
 
         self.replicate_token = (
             FileController().load_json().get("REPLICATE_API_TOKEN", "")
@@ -342,23 +344,24 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             self.setStyleSheet(qss_stream_all)
 
-        cursor = QPixmap(resource_path("style/cursor/nyj.png"))
-        orig_w, orig_h = cursor.width(), cursor.height()
-        orig_hot_x, orig_hot_y = 357, 524
+        ## Cursor 기능 임시 비할성화 ##
+        # cursor = QPixmap(resource_path("style/cursor/nyj.png"))
+        # orig_w, orig_h = cursor.width(), cursor.height()
+        # orig_hot_x, orig_hot_y = 357, 524
 
-        scaled_w, scaled_h = 64, 64
-        cursor_pixmap = cursor.scaled(
-            scaled_w,
-            scaled_h,
-            Qt.KeepAspectRatio,
-            Qt.SmoothTransformation,
-        )
+        # scaled_w, scaled_h = 64, 64
+        # cursor_pixmap = cursor.scaled(
+        #     scaled_w,
+        #     scaled_h,
+        #     Qt.KeepAspectRatio,
+        #     Qt.SmoothTransformation,
+        # )
 
-        hot_x = int(orig_hot_x * scaled_w / orig_w)
-        hot_y = int(orig_hot_y * scaled_h / orig_h)
+        # hot_x = int(orig_hot_x * scaled_w / orig_w)
+        # hot_y = int(orig_hot_y * scaled_h / orig_h)
 
-        cursor = QCursor(cursor_pixmap, hot_x, hot_y)
-        QApplication.setOverrideCursor(cursor)
+        # cursor = QCursor(cursor_pixmap, hot_x, hot_y)
+        # QApplication.setOverrideCursor(cursor)
 
     def _load_external_font(self, font_path):
         font_id = QFontDatabase.addApplicationFont(font_path)
@@ -763,7 +766,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         if self.cap is not None:
             return
-        self.cap = cv2.VideoCapture(self.camera_port) ## 
+        self.cap = cv2.VideoCapture(self.camera_port)  ##
         if not self.cap.isOpened():
             QtWidgets.QMessageBox.critical(self, "오류", "카메라를 열 수 없습니다.")
             self.cap.release()
