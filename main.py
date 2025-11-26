@@ -296,6 +296,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.pool = QThreadPool().globalInstance()
 
+        self.camera_port = FileController().load_json().get("CAMERA_PORT", "") ## 카메라 포트 json 추가
+
         self.replicate_token = (
             FileController().load_json().get("REPLICATE_API_TOKEN", "")
         )
@@ -761,7 +763,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         if self.cap is not None:
             return
-        self.cap = cv2.VideoCapture(0)
+        self.cap = cv2.VideoCapture(self.camera_port) ## 
         if not self.cap.isOpened():
             QtWidgets.QMessageBox.critical(self, "오류", "카메라를 열 수 없습니다.")
             self.cap.release()
@@ -825,7 +827,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             if hasattr(self, "_last_frame_bgr") and self._last_frame_bgr is not None:
                 success, buf = cv2.imencode(
-                    ".png", cv2.imread(resource_path("teen_ager(female).png"))
+                    ".png", self._last_frame_bgr
                 )  # self._last_frame_bgr로 교체
                 if success:
                     self.captured_png_bytes = bytes(buf)

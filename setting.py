@@ -11,6 +11,7 @@ class FileController:
     def init_json(self):
         json_string = {
             "REPLICATE_API_TOKEN": "",
+            "CAMERA_PORT": 0,
         }
 
         if not os.path.isfile(self.path):
