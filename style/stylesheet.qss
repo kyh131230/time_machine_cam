@@ -1,11 +1,11 @@
 /* === 기본 배경, 폰트 === */
 QMainWindow {
-    background-color: #E8DCC5; /* 따뜻한 아이보리톤 */
+    background-color: #F4F1EA; /* 눈처럼 밝은 크림 화이트 */
 }
 
 QLabel {
     font-family: 'Maple Story';
-    color: #4B3B2B;
+    color: #3A2F2F; /* 겨울 분위기 진한 브라운 */
 }
 
 /* === 공통 버튼 스타일 === */
@@ -14,7 +14,7 @@ QPushButton {
     font-size: 30px;
     font-weight: 500;
     color: #FFF;
-    background-color: #D2691E;      /* 초콜릿 브라운 */
+    background-color: #B22222;      /* 크리스마스 딥 레드 */
     border: none;
     border-radius: 10px;
     padding: 10px 18px;
@@ -22,65 +22,67 @@ QPushButton {
 }
 
 QPushButton:hover {
-    background-color: #E07B39;      /* 약간 밝은 오렌지 브라운 */
+    background-color: #CC3A3A;      /* 밝은 크리스마스 레드 */
 }
 
 QPushButton:pressed {
-    background-color: #B85C1E;      /* 눌렀을 때 진한 브라운 */
+    background-color: #8A1A1A;      /* 눌렀을 때 진한 와인 레드 */
 }
 
-/* === 뒤로가기 버튼 (btn_back) — 차분한 올리브 톤 === */
+/* === 뒤로가기 버튼 (btn_back) — 겨울 그린 톤 === */
 QPushButton#btn_back {
-    background-color: #8B7355;
+    background-color: #2E5C45;      /* 딥 포레스트 그린 */
     color: #FFF;
 }
 QPushButton#btn_back:hover {
-    background-color: #A68966;
+    background-color: #3F7A5C;      /* 밝은 그린 */
 }
 QPushButton#btn_back:pressed {
-    background-color: #6F5A41;
+    background-color: #234333;      /* 눌렀을 때 어두운 그린 */
 }
 
-/* === 다음 버튼 (btn_next) — 부드러운 브론즈 오렌지톤 === */
+/* === 다음 버튼 (btn_next) — 크리스마스 로즈골드 === */
 QPushButton#btn_next {
-    background-color: #C97B4E;   /* 부드러운 브론즈 오렌지 */
+    background-color: #D7A37A;   /* 로즈골드 */
     color: #FFF;
 }
 
 QPushButton#btn_next:hover {
-    background-color: #D89263;   /* 밝은 라이트 테라코타 */
+    background-color: #E7B692;   /* 밝은 로즈골드 */
 }
 
 QPushButton#btn_next:pressed {
-    background-color: #A8653D;   /* 눌렀을 때 진한 브론즈 */
+    background-color: #C48B65;   /* 진한 로즈골드 */
 }
 
+
+
 QPushButton#btn_next:disabled {
-    background-color: #D5BCA5;   /* 흐린 베이지톤으로 채도 낮춤 */
-    color: #F0E7DE;              /* 텍스트도 흐리게 */
+    background-color: #E3D4B8;   /* 흐린 겨울 베이지 골드 */
+    color: #F6F0E6;              
     border: none;
 }
 
-/* === 인쇄 버튼 (btn_print) — 진한 카푸치노 톤 === */
+/* === 인쇄 버튼 (btn_print) — 진한 겨울 초코 브라운 === */
 QPushButton#btn_print {
-    background-color: #A0522D;
+    background-color: #5A3E2B;   /* 다크 초코 브라운 */
     color: #FFF8F0;
 }
 QPushButton#btn_print:hover {
-    background-color: #B86B4B;
+    background-color: #704E38;   /* 조금 밝은 브라운 */
 }
 QPushButton#btn_print:pressed {
-    background-color: #81472B;
+    background-color: #4A2F20;   /* 눌렀을 때 더 짙은 브라운 */
 }
 
-/* === 캡처 버튼 (btn_caputre) — 붉은 브릭 컬러로 포인트 === */
+/* === 캡처 버튼 (btn_caputre) — 크리스마스 포인트 레드 === */
 QPushButton#btn_caputre {
-    background-color: #C04B3E;
+    background-color: #B0272A;  /* 클래식 레드 */
     color: #FFF;
 }
 QPushButton#btn_caputre:hover {
-    background-color: #D35C4F;
+    background-color: #CB3A3E;  /* 밝은 레드 */
 }
 QPushButton#btn_caputre:pressed {
-    background-color: #9E3A2F;
+    background-color: #8C1F22;  /* 눌렀을 때 딥 와인 레드 */
 }

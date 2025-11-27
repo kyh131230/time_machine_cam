@@ -874,28 +874,28 @@ class MainWindow(QtWidgets.QMainWindow):
 
         target.setStyleSheet(
             """
-        /* ✅ 선택된 상태 — 배경이 강조됨 */
-        QLabel#past_label[selected="true"],
-        QLabel#future_label[selected="true"],
-        *#past_label[selected="true"],
-        *#future_label[selected="true"] {
-            background-color: #C97B4E;     /* 브론즈 오렌지 */
-            color: #FFF;
-            border: 10px solid #C97B4E;
-            border-radius: 12px;
-        }
+                /* ✅ 선택된 상태 — 파스텔 레드 강조 */
+                QLabel#past_label[selected="true"],
+                QLabel#future_label[selected="true"],
+                *#past_label[selected="true"],
+                *#future_label[selected="true"] {
+                    background-color: #E58A8A;     /* 파스텔 레드 */
+                    color: #FFFFFF;
+                    border: 10px solid #E58A8A;
+                    border-radius: 12px;
+                }
 
-        /* ✅ 마우스 오버(hover) 시 — 테두리만 표시 */
-        QLabel#past_label:hover,
-        QLabel#future_label:hover,
-        *#past_label:hover,
-        *#future_label:hover {
-            background-color: transparent;
-            color: #C97B4E;
-            border: 10px solid #C97B4E;     /* hover 시 부드러운 브론즈 테두리 */
-            border-radius: 12px;
-        }
-        """
+                /* ✅ 마우스 오버(hover) 시 — 더 밝은 파스텔 레드 테두리 */
+                QLabel#past_label:hover,
+                QLabel#future_label:hover,
+                *#past_label:hover,
+                *#future_label:hover {
+                    background-color: transparent;
+                    color: #E58A8A;                /* 파스텔 레드 */
+                    border: 10px solid #EEA4A4;    /* 밝은 파스텔 레드 테두리 */
+                    border-radius: 12px;
+                }
+                """
         )
 
         btn_next = getattr(target, "btn_next", None)
@@ -954,12 +954,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.slot_source = [None, None]  # 다시 살리기
         self.candidates = []
 
-        self._empty_style = (
-            "border: 3px dashed #bbb; background:#111; color:#999; font-size:20px;"
-        )
-        self._filled_style = "border: 3px solid #4CAF50; background:#000;"
-        self._thumb_style = "border: 2px solid transparent; background:#000;"
-        self._thumb_disabled = "border: 2px solid #999; background:#333; opacity:0.6;"
+        self._empty_style = "border: 3px dashed #D0C7B5; background:#F0EEE8; color:#7A6F67; font-size:20px;"  # 눈톤 + 따뜻한 그레이
+
+        self._filled_style = "border: 3px solid #2E6B3F; background:#F9F9F5;"
+        # 포레스트 그린 + 밝은 눈색 배경
+
+        self._thumb_style = "border: 2px solid transparent; background:#FAFAF7;"
+        # 밝은 화이트 베이지
+
+        self._thumb_disabled = "border: 2px solid #AAA; background:#E1DFDB; opacity:0.6;"  # 흐린 겨울 그레이톤
 
         for i, lbl in enumerate(self.thumb_labels):
             if lbl:
@@ -1207,16 +1210,16 @@ class MainWindow(QtWidgets.QMainWindow):
                 background-color: transparent;
             }
             QFrame:hover {
-                border: 2px solid #FA8072;
-                background-color: rgba(250, 128, 114, 0.1); /* 살짝 밝은 살구빛 */
+                border: 2px solid #C94C46; /* 크리스마스 브릭 레드 */
+                background-color: rgba(201, 76, 70, 0.15); /* 크리스마스 레드 투명 */
             }
             """
 
         self._frame_thumb_selected = """
         QFrame {
-            border: 2px solid #FA8072;
+            border: 2px solid #C94C46;   /* 포인트 레드 */
             border-radius: 12px;
-            background-color: #FA8072;
+            background-color: #C94C46;   /* 깊은 크리스마스 레드 */
         }
         """
 
